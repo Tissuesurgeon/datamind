@@ -1,0 +1,57 @@
+# Node
+node_modules/
+.pnpm-store/
+.next/
+.turbo/
+out/
+dist/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+.env
+.envrc
+.python-version
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Project artifacts
+.run/
+logs/
+*.log
+.cache/
+uploads/
+storage_local/
+checkpoints/
+hf-cache/
+
+# Foundry
+smart-contracts/out/
+smart-contracts/cache/
+smart-contracts/broadcast/
+!smart-contracts/broadcast/**/run-latest.json
+
+# Docker
+docker/.data/
+
+# Secrets — never commit
+*.pem
+*.key
+.env.*
+!.env.example

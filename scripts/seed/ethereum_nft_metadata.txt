@@ -1,0 +1,7 @@
+Ethereum NFT Metadata
+
+Cleaned metadata + traits for 4M NFTs across 1,200 collections, with rarity scores and cluster embeddings.
+
+Categories: nft, ethereum, metadata, rarity
+Topics: Profile pictures, Generative art
+Sample summary: Metadata for 4M NFTs, normalized trait schema, rarity index pre-computed.

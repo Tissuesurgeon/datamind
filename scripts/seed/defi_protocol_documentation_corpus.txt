@@ -1,0 +1,7 @@
+DeFi Protocol Documentation Corpus
+
+Cleaned developer docs for 42 top DeFi protocols (Aave, Uniswap, Curve, Compound, Maker, Lido, GMX, …) — pre-chunked for RAG.
+
+Categories: defi, documentation, rag, smart-contracts
+Topics: Lending markets, AMM design, Liquidations, Governance
+Sample summary: 26.5k docs paragraphs from 42 DeFi protocols, deduped + chunk-aligned to 256 tokens. Ready for RAG pipelines and code-aware fine-tuning.

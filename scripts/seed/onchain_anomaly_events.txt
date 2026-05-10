@@ -1,0 +1,7 @@
+Onchain Anomaly Events
+
+Labeled timeline of MEV sandwiches, oracle deviations, large rebalances, and exploit signatures across 5 chains.
+
+Categories: mev, anomalies, exploits, onchain
+Topics: MEV sandwich, Oracle deviation, Liquidation cascades
+Sample summary: 8.1k labeled onchain anomaly events with chain, block, type, severity.

@@ -1,0 +1,20 @@
+{
+  "name": "datamind-og-bridge",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Node sidecar bridging DataMind to @0glabs/0g-ts-sdk for storage uploads + downloads.",
+  "main": "cli.mjs",
+  "bin": {
+    "datamind-og": "cli.mjs"
+  },
+  "scripts": {
+    "upload": "node cli.mjs upload",
+    "download": "node cli.mjs download",
+    "serve": "node cli.mjs serve"
+  },
+  "dependencies": {
+    "@0glabs/0g-ts-sdk": "^0.4.0",
+    "ethers": "^6.13.0"
+  }
+}

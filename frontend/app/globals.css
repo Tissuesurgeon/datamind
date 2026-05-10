@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background: #0A0A0B;
+  color: #F5F5F5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  ::selection {
+    background-color: rgba(245, 165, 36, 0.22);
+    color: #fff;
+  }
+  body {
+    background-image:
+      radial-gradient(80vw 60vh at 8% -10%, rgba(245,165,36,0.06), transparent 60%),
+      radial-gradient(60vw 50vh at 95% 0%, rgba(229,36,122,0.06), transparent 60%);
+  }
+  h1, h2, h3, h4 {
+    letter-spacing: -0.02em;
+    font-weight: 500;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-border-subtle;
+  }
+  .glass-strong {
+    @apply bg-white/[0.05] backdrop-blur-xl border border-border-strong;
+  }
+  .gradient-text {
+    @apply bg-gradient-brand bg-clip-text text-transparent;
+  }
+  .ring-brand {
+    @apply ring-1 ring-brand-amber-500/40;
+  }
+  .dot-grid-bg {
+    background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+}

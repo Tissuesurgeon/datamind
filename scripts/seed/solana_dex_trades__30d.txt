@@ -1,0 +1,7 @@
+Solana DEX Trades — 30d
+
+30 days of trades from Raydium, Orca, Phoenix and Lifinity with user clustering and wallet-cohort tags.
+
+Categories: solana, dex, trades, tabular
+Topics: Memecoin rotations, Stablecoin arb
+Sample summary: 1.2M trade events across four Solana DEXs over the last 30 days.

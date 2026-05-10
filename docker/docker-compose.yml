@@ -1,0 +1,139 @@
+# =============================================================================
+# DataMind — full-stack docker compose.
+# Targets: local dev datastores OR a complete production-style deployment.
+# Run from repo root:  make compose-up
+# =============================================================================
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: datamind_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-datamind}
+      POSTGRES_USER: ${POSTGRES_USER:-datamind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datamind}
+    ports:
+      # Bind to a non-default host port to avoid colliding with a system Postgres.
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datamind} -d ${POSTGRES_DB:-datamind}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:v1.11.0
+    container_name: datamind_qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HOST_PORT:-56333}:6333"
+      - "${QDRANT_GRPC_HOST_PORT:-56334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/readyz | grep -q ok || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: datamind_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT:-56379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  ai-engine:
+    build:
+      context: ..
+      dockerfile: docker/ai-engine.Dockerfile
+    container_name: datamind_ai_engine
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      AI_ENGINE_PORT: 8100
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8100:8100"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - hf_cache:/app/hf-cache
+      - checkpoints:/app/checkpoints
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    container_name: datamind_backend
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-datamind}:${POSTGRES_PASSWORD:-datamind}@postgres:5432/${POSTGRES_DB:-datamind}
+      QDRANT_URL: http://qdrant:6333
+      REDIS_URL: redis://redis:6379/0
+      AI_ENGINE_URL: http://ai-engine:8100
+      BACKEND_UPLOAD_DIR: /app/storage_local
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ai-engine:
+        condition: service_started
+    volumes:
+      - storage_local:/app/storage_local
+
+  og-bridge:
+    build:
+      context: ..
+      dockerfile: docker/og-bridge.Dockerfile
+    container_name: datamind_og_bridge
+    restart: unless-stopped
+    env_file: ../.env
+    profiles: ["og"]   # opt-in: docker compose --profile og up
+    command: ["node", "infra/og-bridge/cli.mjs", "serve"]
+    ports:
+      - "8200:8200"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    container_name: datamind_frontend
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000/api/v1
+      NEXT_PUBLIC_WS_BASE: ws://localhost:8000/ws
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pg_data:
+  qdrant_data:
+  redis_data:
+  hf_cache:
+  checkpoints:
+  storage_local:

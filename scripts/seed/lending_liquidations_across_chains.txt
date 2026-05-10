@@ -1,0 +1,7 @@
+Lending Liquidations Across Chains
+
+Cross-chain liquidation events from Aave, Compound, Morpho, Spark and Kamino. Includes pre-liquidation health factor curves.
+
+Categories: lending, liquidations, risk, defi
+Topics: Vol regime, Cascade events
+Sample summary: Cross-chain lending liquidations with pre-event health factor curves.
