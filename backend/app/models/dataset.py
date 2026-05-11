@@ -65,12 +65,20 @@ class Dataset(IdMixin, TimestampMixin, Base):
 
     # Lifecycle
     visibility: Mapped[DatasetVisibility] = mapped_column(
-        SAEnum(DatasetVisibility, name="dataset_visibility"),
+        SAEnum(
+            DatasetVisibility,
+            name="dataset_visibility",
+            values_callable=lambda e: [m.value for m in e],
+        ),
         default=DatasetVisibility.PUBLIC,
         nullable=False,
     )
     status: Mapped[DatasetStatus] = mapped_column(
-        SAEnum(DatasetStatus, name="dataset_status"),
+        SAEnum(
+            DatasetStatus,
+            name="dataset_status",
+            values_callable=lambda e: [m.value for m in e],
+        ),
         default=DatasetStatus.UPLOADING,
         nullable=False,
     )

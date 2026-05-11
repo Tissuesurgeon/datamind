@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0001"
 down_revision: str | Sequence[str] | None = None
@@ -17,6 +18,68 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # Alembic's create_table fires enum DDL with checkfirst=False. In that path
+    # PostgreSQL's EnumGenerator always emits CREATE TYPE if the column type
+    # has create_type=True (the default). We therefore:
+    # 1) CREATE TYPE ... up front with checkfirst=True
+    # 2) use postgresql.ENUM(..., create_type=False) on columns so table DDL
+    #    never tries to recreate the type (avoids DuplicateObject on retries).
+    bind = op.get_bind()
+    postgresql.ENUM(
+        "public", "private", "unlisted", name="dataset_visibility"
+    ).create(bind, checkfirst=True)
+    postgresql.ENUM(
+        "uploading", "processing", "ready", "failed", name="dataset_status"
+    ).create(bind, checkfirst=True)
+    postgresql.ENUM(
+        "pending",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled",
+        name="training_job_status",
+    ).create(bind, checkfirst=True)
+    postgresql.ENUM(
+        "personal",
+        "commercial",
+        "academic",
+        "exclusive",
+        name="license_kind",
+    ).create(bind, checkfirst=True)
+
+    visibility = postgresql.ENUM(
+        "public",
+        "private",
+        "unlisted",
+        name="dataset_visibility",
+        create_type=False,
+    )
+    status = postgresql.ENUM(
+        "uploading",
+        "processing",
+        "ready",
+        "failed",
+        name="dataset_status",
+        create_type=False,
+    )
+    train_status = postgresql.ENUM(
+        "pending",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled",
+        name="training_job_status",
+        create_type=False,
+    )
+    license_kind = postgresql.ENUM(
+        "personal",
+        "commercial",
+        "academic",
+        "exclusive",
+        name="license_kind",
+        create_type=False,
+    )
+
     op.create_table(
         "users",
         sa.Column("id", sa.String(length=26), primary_key=True),
@@ -28,11 +91,6 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index("ix_users_wallet", "users", ["wallet_address"])
-
-    visibility = sa.Enum("public", "private", "unlisted", name="dataset_visibility")
-    status = sa.Enum("uploading", "processing", "ready", "failed", name="dataset_status")
-    visibility.create(op.get_bind(), checkfirst=True)
-    status.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "datasets",
@@ -69,6 +127,7 @@ def upgrade() -> None:
     op.create_index("ix_datasets_owner_id", "datasets", ["owner_id"])
     op.create_index("ix_datasets_category", "datasets", ["category"])
     op.create_index("ix_datasets_storage_root", "datasets", ["storage_root"])
+
 
     op.create_table(
         "dataset_files",
@@ -117,16 +176,6 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
 
-    train_status = sa.Enum(
-        "pending",
-        "running",
-        "succeeded",
-        "failed",
-        "cancelled",
-        name="training_job_status",
-    )
-    train_status.create(op.get_bind(), checkfirst=True)
-
     op.create_table(
         "training_jobs",
         sa.Column("id", sa.String(length=26), primary_key=True),
@@ -148,9 +197,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_training_user_id", "training_jobs", ["user_id"])
     op.create_index("ix_training_dataset_id", "training_jobs", ["dataset_id"])
-
-    license_kind = sa.Enum("personal", "commercial", "academic", "exclusive", name="license_kind")
-    license_kind.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "dataset_licenses",

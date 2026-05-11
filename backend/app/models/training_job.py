@@ -34,7 +34,11 @@ class TrainingJob(IdMixin, TimestampMixin, Base):
     config: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
     status: Mapped[TrainingJobStatus] = mapped_column(
-        SAEnum(TrainingJobStatus, name="training_job_status"),
+        SAEnum(
+            TrainingJobStatus,
+            name="training_job_status",
+            values_callable=lambda e: [m.value for m in e],
+        ),
         default=TrainingJobStatus.PENDING,
         nullable=False,
     )

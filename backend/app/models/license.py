@@ -26,7 +26,11 @@ class DatasetLicense(IdMixin, TimestampMixin, Base):
     )
     grantee_wallet: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     kind: Mapped[LicenseKind] = mapped_column(
-        SAEnum(LicenseKind, name="license_kind"),
+        SAEnum(
+            LicenseKind,
+            name="license_kind",
+            values_callable=lambda e: [m.value for m in e],
+        ),
         default=LicenseKind.PERSONAL,
         nullable=False,
     )

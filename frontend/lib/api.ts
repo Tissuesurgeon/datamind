@@ -1,6 +1,6 @@
 "use client";
 
-import { ENV } from "@/lib/env";
+import { getApiBase } from "@/lib/env";
 import { useAuthStore } from "@/lib/auth-store";
 
 export class ApiError extends Error {
@@ -20,7 +20,7 @@ type RequestOpts = {
 
 async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
   const { method = "GET", body, formData, headers = {}, signal, auth = true } = opts;
-  const url = path.startsWith("http") ? path : `${ENV.apiBase}${path}`;
+  const url = path.startsWith("http") ? path : `${getApiBase()}${path}`;
 
   const finalHeaders: Record<string, string> = { Accept: "application/json", ...headers };
   if (!formData) {

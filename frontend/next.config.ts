@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
-const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
+// Server-side rewrite target (set in Vercel/Railway to your FastAPI root + /api/v1).
+// BACKEND_INTERNAL_URL keeps the real API URL out of the browser when using /api/proxy.
+const apiBase = (
+  process.env.BACKEND_INTERNAL_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  "http://localhost:8000/api/v1"
+).replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -9,8 +15,10 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      // Optionally proxy API in dev to avoid CORS during local work.
-      { source: "/api/proxy/:path*", destination: `${apiBase}/:path*` },
+      {
+        source: "/api/proxy/:path*",
+        destination: `${apiBase}/:path*`,
+      },
     ];
   },
 };

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ENV } from "@/lib/env";
+import { getWsBase } from "@/lib/env";
 import type { RealtimeEvent } from "@/types";
 
 type Options = {
@@ -26,7 +26,7 @@ export function useLiveTopic(topic: string | null | undefined, opts: Options = {
 
     const connect = () => {
       if (stopped) return;
-      const url = `${ENV.wsBase}/${encodeURIComponent(topic)}`;
+      const url = `${getWsBase()}/${encodeURIComponent(topic)}`;
       try {
         const ws = new WebSocket(url);
         wsRef.current = ws;
