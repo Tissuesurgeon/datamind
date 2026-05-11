@@ -50,4 +50,9 @@ class TrainingJob(IdMixin, TimestampMixin, Base):
     checkpoint_root: Mapped[str | None] = mapped_column(String(80), nullable=True)
     checkpoint_tx_hash: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
+    # On-chain TrainingRegistry linkage (populated when user signs the tx).
+    contract_job_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    chain_start_tx_hash: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    chain_complete_tx_hash: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
     owner: Mapped["User"] = relationship("User", back_populates="training_jobs")  # noqa: F821

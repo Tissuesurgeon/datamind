@@ -13,12 +13,14 @@ from app.models.dataset import Dataset, DatasetStatus, DatasetVisibility
 from app.models.dataset_analytics import DatasetAnalytics
 from app.schemas.common import Page, PageInfo
 from app.schemas.dataset import (
+    DatasetChainConfirm,
     DatasetDetail,
     DatasetListItem,
     DatasetSummary,
     DatasetUpdate,
     DatasetUploadResponse,
 )
+from app.services.datasets.chain_confirm import confirm_chain
 from app.services.datasets.ingest import ingest_dataset, run_pipeline_in_background
 from app.utils.files import save_upload, sniff_format, guess_mime
 
@@ -48,6 +50,14 @@ def _to_summary(d: Dataset) -> DatasetSummary:
 
 
 def _to_detail(d: Dataset, a: DatasetAnalytics | None) -> DatasetDetail:
+    nft = getattr(d, "nft", None)
+    pending_args: dict[str, str] | None = None
+    if (
+        d.status == DatasetStatus.PENDING_CHAIN
+        and d.storage_root
+        and d.metadata_uri
+    ):
+        pending_args = {"storage_root": d.storage_root, "metadata_uri": d.metadata_uri}
     return DatasetDetail(
         id=d.id,
         title=d.title,
@@ -80,6 +90,15 @@ def _to_detail(d: Dataset, a: DatasetAnalytics | None) -> DatasetDetail:
         topics=list(a.topics) if a else [],
         quality_metrics=dict(a.quality_metrics) if a else {},
         sample_rows=list(a.sample_rows) if a else [],
+        nft_contract=nft.contract_address if nft else None,
+        nft_token_id=nft.token_id if nft else None,
+        mint_tx_hash=nft.mint_tx_hash if nft else None,
+        register_tx_hash=nft.register_tx_hash if nft else None,
+        owner_address=(
+            (nft.owner_wallet if nft else None)
+            or (d.owner.wallet_address if d.owner else None)
+        ),
+        pending_chain_args=pending_args,
     )
 
 
@@ -179,7 +198,11 @@ async def list_datasets(
 async def get_dataset(dataset_id: str, db: DBSession) -> DatasetDetail:
     res = await db.execute(
         select(Dataset)
-        .options(selectinload(Dataset.owner), selectinload(Dataset.analytics))
+        .options(
+            selectinload(Dataset.owner),
+            selectinload(Dataset.analytics),
+            selectinload(Dataset.nft),
+        )
         .where(Dataset.id == dataset_id)
     )
     d = res.scalar_one_or_none()
@@ -197,7 +220,11 @@ async def update_dataset(
 ) -> DatasetDetail:
     res = await db.execute(
         select(Dataset)
-        .options(selectinload(Dataset.owner), selectinload(Dataset.analytics))
+        .options(
+            selectinload(Dataset.owner),
+            selectinload(Dataset.analytics),
+            selectinload(Dataset.nft),
+        )
         .where(Dataset.id == dataset_id)
     )
     d = res.scalar_one_or_none()
@@ -230,3 +257,37 @@ async def delete_dataset(dataset_id: str, user: CurrentUser, db: DBSession) -> R
         raise HTTPException(status_code=403, detail="forbidden")
     await db.delete(d)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{dataset_id}/chain-confirm", response_model=DatasetDetail)
+async def chain_confirm(
+    dataset_id: str,
+    payload: DatasetChainConfirm,
+    user: CurrentUser,
+    db: DBSession,
+) -> DatasetDetail:
+    """Confirm user-signed mint + register transactions for a pending dataset.
+
+    The frontend calls this after `wagmi` confirms the on-chain receipts so the
+    dataset row flips to READY without waiting for the chain indexer. Idempotent:
+    re-posting the same hashes is safe.
+    """
+    res = await db.execute(
+        select(Dataset)
+        .options(
+            selectinload(Dataset.owner),
+            selectinload(Dataset.analytics),
+            selectinload(Dataset.nft),
+        )
+        .where(Dataset.id == dataset_id)
+    )
+    d = res.scalar_one_or_none()
+    if d is None:
+        raise HTTPException(status_code=404, detail="dataset not found")
+    if d.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    await confirm_chain(db, dataset=d, payload=payload)
+    await db.flush()
+    await db.refresh(d, attribute_names=["owner", "analytics"])
+    return _to_detail(d, d.analytics)

@@ -21,6 +21,13 @@ export function getApiBase(): string {
   return "http://localhost:8000/api/v1";
 }
 
+/** Download URL for a blob by 0G storage root (goes to FastAPI `/storage/{root}`, not Next.js). */
+export function getStorageFetchUrl(storageRoot: string): string {
+  const root = storageRoot.trim();
+  const base = getApiBase();
+  return `${base}/storage/${encodeURIComponent(root)}`;
+}
+
 function httpApiToWsBase(apiUrl: string): string | null {
   try {
     const u = new URL(apiUrl);

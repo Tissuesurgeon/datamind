@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.ai.client import AnalyzeResult, get_ai_client
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.session import session_scope
 from app.models.dataset import Dataset, DatasetFile, DatasetStatus
@@ -237,6 +238,46 @@ async def run_ingest_pipeline(dataset_id: str) -> None:
             d.progress = 75
 
     # ---- Anchor on chain -----------------------------------------------------
+    settings = get_settings()
+    if settings.web3_user_tx:
+        # Hand the chain step to the frontend: the connected wallet will mint
+        # the DatasetNFT and call DatasetRegistry.register itself. The dataset
+        # parks in PENDING_CHAIN until /datasets/{id}/chain-confirm fires (or
+        # the on-chain indexer picks up the events).
+        async with session_scope() as db:
+            res = await db.execute(select(Dataset).where(Dataset.id == dataset_id))
+            d = res.scalar_one_or_none()
+            if d is not None:
+                d.status = DatasetStatus.PENDING_CHAIN
+                d.progress = 85
+
+        await _publish(
+            topic,
+            EventType.STORAGE_ANCHORED,
+            {
+                "storage_root": og_result["root"],
+                "tx_hash": og_result.get("tx_hash"),
+                "metadata_uri": metadata_uri,
+                "mode": og_result.get("mode"),
+                "pending_chain": True,
+                "chain_args": {
+                    "storage_root": og_result["root"],
+                    "metadata_uri": metadata_uri,
+                },
+            },
+        )
+        await _publish(
+            topic,
+            EventType.UPLOAD_COMPLETED,
+            {
+                "dataset_id": dataset_id,
+                "embeddings": indexed,
+                "pending_chain": True,
+            },
+        )
+        return
+
+    # Server-signed (mock or live-with-server-key) — legacy path.
     chain = await chain_registry.register_dataset(
         storage_root=og_result["root"], metadata_uri=metadata_uri
     )

@@ -2,13 +2,17 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Sparkles } from "lucide-react";
+import { ArrowLeft, BadgeCheck, ExternalLink, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { QualityBadge } from "@/components/datamind/quality-badge";
+import { PendingChainContinue } from "@/components/web3/PendingChainContinue";
 import { useDataset } from "@/lib/queries";
 import { compactNumber, shortHash } from "@/lib/utils";
+import { OG_CHAIN_ID } from "@/lib/web3/networks";
+import { addressUrl, tokenUrl, txUrl } from "@/lib/web3/utils";
+import { getStorageFetchUrl } from "@/lib/env";
 
 export default function DatasetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -36,6 +40,8 @@ export default function DatasetDetailPage({ params }: { params: Promise<{ id: st
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back
       </Link>
+
+      {data.status === "pending_chain" && <PendingChainContinue datasetId={data.id} />}
 
       <header className="flex flex-wrap items-start justify-between gap-6">
         <div>
@@ -136,12 +142,56 @@ export default function DatasetDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="space-y-6">
-          <Card title="Provenance">
-            <Row label="Owner" value={data.owner_wallet} mono />
+          <Card title="On-chain identity">
+            <Row
+              label="Owner"
+              value={data.owner_address || data.owner_wallet}
+              mono
+              href={addressUrl(data.owner_address || data.owner_wallet)}
+            />
+            <Row
+              label="Dataset NFT"
+              value={
+                data.nft_contract && data.nft_token_id != null
+                  ? `#${data.nft_token_id}`
+                  : "Not minted"
+              }
+              mono
+              href={
+                data.nft_contract && data.nft_token_id != null
+                  ? tokenUrl(data.nft_contract, data.nft_token_id)
+                  : null
+              }
+              badge={data.nft_contract && data.nft_token_id != null ? "minted" : null}
+            />
+            <Row
+              label="Mint tx"
+              value={shortHash(data.mint_tx_hash || "—")}
+              mono
+              href={txUrl(data.mint_tx_hash)}
+            />
+            <Row
+              label="Registry tx"
+              value={shortHash(data.register_tx_hash || "—")}
+              mono
+              href={txUrl(data.register_tx_hash)}
+            />
+            <Row
+              label="On-chain id"
+              value={data.onchain_id ? `#${data.onchain_id}` : "—"}
+              mono
+            />
+            <Row label="Chain id" value={String(OG_CHAIN_ID)} mono />
+          </Card>
+
+          <Card title="0G Storage">
             <Row label="Storage root" value={shortHash(data.storage_root || "—")} mono />
-            <Row label="Tx hash" value={shortHash(data.storage_tx_hash || "—")} mono />
-            <Row label="Chain id" value={"16602"} mono />
-            <Row label="On-chain id" value={data.onchain_id ? `#${data.onchain_id}` : "—"} mono />
+            <Row
+              label="Storage tx"
+              value={shortHash(data.storage_tx_hash || "—")}
+              mono
+              href={txUrl(data.storage_tx_hash)}
+            />
             <Row label="Metadata URI" value={shortHash(data.metadata_uri || "—")} mono />
           </Card>
 
@@ -158,7 +208,7 @@ export default function DatasetDetailPage({ params }: { params: Promise<{ id: st
             <Row label="Downloads" value={compactNumber(data.downloads)} />
             {data.storage_root && (
               <a
-                href={`/api/v1/storage/${data.storage_root}`}
+                href={getStorageFetchUrl(data.storage_root)}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-3 inline-flex items-center gap-1.5 text-sm text-brand-amber-300 hover:underline"
@@ -184,11 +234,43 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function Row({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+function Row({
+  label,
+  value,
+  mono = false,
+  href = null,
+  badge = null,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  href?: string | null;
+  badge?: string | null;
+}) {
+  const cls = "text-xs " + (mono ? "font-mono " : "") + "text-text";
+  const content = href ? (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={cls + " inline-flex items-center gap-1 hover:text-brand-amber-300"}
+    >
+      {value}
+      <ExternalLink className="h-3 w-3" />
+    </a>
+  ) : (
+    <span className={cls}>{value}</span>
+  );
+
   return (
-    <div className="flex items-center justify-between border-b border-border-subtle py-2 last:border-0">
-      <span className="text-xs text-text-dim">{label}</span>
-      <span className={"text-xs " + (mono ? "font-mono " : "") + "text-text"}>{value}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-border-subtle py-2 last:border-0">
+      <span className="inline-flex items-center gap-2 text-xs text-text-dim">
+        {label}
+        {badge === "minted" ? (
+          <BadgeCheck className="h-3 w-3 text-brand-magenta-300" />
+        ) : null}
+      </span>
+      {content}
     </div>
   );
 }

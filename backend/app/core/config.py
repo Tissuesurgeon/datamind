@@ -108,6 +108,29 @@ class Settings(BaseSettings):
     privy_app_id: str | None = Field(default=None, alias="PRIVY_APP_ID")
     privy_app_secret: SecretStr | None = Field(default=None, alias="PRIVY_APP_SECRET")
 
+    # --- Web3 user-tx mode -------------------------------------------------
+    # When true, the ingest pipeline stops short of server-signing the
+    # DatasetRegistry.register transaction; the frontend (wagmi) is expected
+    # to mint the NFT + register the dataset on-chain with the connected
+    # wallet, then POST tx hashes to /datasets/{id}/chain-confirm.
+    web3_user_tx: bool = Field(default=False, alias="DATAMIND_WEB3_USER_TX")
+    dataset_nft_address: str | None = Field(default=None, alias="DATASET_NFT_ADDRESS")
+    training_registry_address: str | None = Field(
+        default=None, alias="TRAINING_REGISTRY_ADDRESS"
+    )
+    usage_economy_address: str | None = Field(
+        default=None, alias="USAGE_ECONOMY_ADDRESS"
+    )
+    chain_indexer_enabled: bool = Field(
+        default=False, alias="DATAMIND_CHAIN_INDEXER"
+    )
+    chain_indexer_start_block: int = Field(
+        default=0, alias="DATAMIND_CHAIN_INDEXER_START_BLOCK"
+    )
+    chain_indexer_poll_seconds: float = Field(
+        default=5.0, alias="DATAMIND_CHAIN_INDEXER_POLL_SECONDS"
+    )
+
     # --- Validators -------------------------------------------------------
 
     @field_validator("upload_dir", mode="after")

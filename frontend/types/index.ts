@@ -1,4 +1,9 @@
-export type DatasetStatus = "uploading" | "processing" | "ready" | "failed";
+export type DatasetStatus =
+  | "uploading"
+  | "processing"
+  | "pending_chain"
+  | "ready"
+  | "failed";
 export type DatasetVisibility = "public" | "private" | "unlisted";
 export type QualityGrade = "A" | "B" | "C";
 
@@ -40,6 +45,13 @@ export type DatasetDetail = DatasetMarketplaceItem & {
   topics: { label: string; weight: number }[];
   quality_metrics: Record<string, number>;
   sample_rows: Record<string, unknown>[];
+  nft_contract: string | null;
+  nft_token_id: number | null;
+  mint_tx_hash: string | null;
+  register_tx_hash: string | null;
+  owner_address: string | null;
+  /** Present while status is `pending_chain` and user-tx mode is on. */
+  pending_chain_args?: { storage_root: string; metadata_uri: string } | null;
 };
 
 export type DatasetUploadResponse = {
@@ -103,6 +115,9 @@ export type TrainingJob = {
     learning_rate?: number;
     [k: string]: unknown;
   };
+  contract_job_id: number | null;
+  chain_start_tx_hash: string | null;
+  chain_complete_tx_hash: string | null;
   created_at: string;
   updated_at: string;
 };

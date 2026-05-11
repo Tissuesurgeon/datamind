@@ -8,6 +8,7 @@ from app.api.v1 import (
     search,
     storage,
     training,
+    web3,
     websocket,
 )
 
@@ -19,5 +20,6 @@ api_router.include_router(embeddings.router, prefix="/embeddings", tags=["embedd
 api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(training.router, prefix="/training", tags=["training"])
 api_router.include_router(storage.router, prefix="/storage", tags=["storage"])
+api_router.include_router(web3.router, prefix="/web3", tags=["web3"])
 
 __all__ = ["api_router", "websocket"]

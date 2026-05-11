@@ -23,6 +23,7 @@ from app.db.session import dispose
 from app.schemas.common import HealthOut
 from app.services.realtime import get_ws_manager
 from app.services.storage import og_client
+from app.web3.listeners import start_indexer, stop_indexer
 
 configure_logging()
 log = get_logger(__name__)
@@ -34,17 +35,21 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     await get_ws_manager().start()
     await og_client.warmup()
+    await start_indexer()
     log.info(
         "backend.ready",
         env=settings.env,
         og_mock=settings.og_mock,
         chain_live=settings.chain_live,
         privy_live=settings.privy_live,
+        web3_user_tx=settings.web3_user_tx,
+        chain_indexer=settings.chain_indexer_enabled,
     )
     try:
         yield
     finally:
         log.info("backend.stopping")
+        await stop_indexer()
         await get_ws_manager().shutdown()
         await dispose()
 

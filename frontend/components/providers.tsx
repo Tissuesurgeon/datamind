@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Toaster } from "sonner";
 
 import { PrivyAuthProvider } from "@/lib/privy";
+import { Web3Provider } from "@/components/web3/Web3Provider";
+import { WalletSessionBridge } from "@/components/web3/WalletSessionBridge";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -22,7 +24,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={client}>
-      <PrivyAuthProvider>{children}</PrivyAuthProvider>
+      <Web3Provider>
+        <PrivyAuthProvider>
+          <WalletSessionBridge />
+          {children}
+        </PrivyAuthProvider>
+      </Web3Provider>
       <Toaster
         theme="dark"
         position="bottom-right"

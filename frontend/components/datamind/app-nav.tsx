@@ -11,7 +11,8 @@ import {
   Workflow,
 } from "lucide-react";
 
-import { WalletButton } from "@/components/datamind/wallet-button";
+import { WalletConnect } from "@/components/web3/WalletConnect";
+import { WalletBalance } from "@/components/web3/WalletBalance";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -55,7 +56,10 @@ export function AppNav() {
           })}
         </nav>
 
-        <WalletButton size="sm" />
+        <div className="inline-flex items-center gap-2">
+          <WalletBalance />
+          <WalletConnect size="sm" />
+        </div>
       </div>
     </header>
   );

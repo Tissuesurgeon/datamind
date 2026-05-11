@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -88,8 +88,33 @@ class DatasetDetail(DatasetSummary):
     topics: list[dict] = []
     quality_metrics: dict = {}
     sample_rows: list[dict] = []
+    # Web3 augmentation — populated when the dataset has been minted/registered.
+    nft_contract: str | None = None
+    nft_token_id: int | None = None
+    mint_tx_hash: str | None = None
+    register_tx_hash: str | None = None
+    owner_address: str | None = None
+    # Populated while status is pending_chain so the UI can drive wagmi without
+    # relying solely on WebSocket delivery (clients may connect after the event).
+    pending_chain_args: dict[str, Any] | None = None
 
 
 class DatasetUploadResponse(BaseModel):
     dataset: DatasetSummary
     ws_topic: str
+
+
+class DatasetChainConfirm(BaseModel):
+    """Frontend → backend callback after user-signed mint + register.
+
+    The on-chain indexer also publishes these events asynchronously; this
+    endpoint exists so the UI can mark the dataset READY instantly without
+    waiting for the indexer's polling tick.
+    """
+
+    onchain_id: int
+    register_tx_hash: str | None = None
+    mint_tx_hash: str | None = None
+    token_id: int | None = None
+    nft_contract: str | None = None
+    chain_id: int | None = None

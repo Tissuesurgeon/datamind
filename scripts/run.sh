@@ -150,7 +150,7 @@ trap cleanup EXIT INT TERM
 # Launch services                                                              #
 # --------------------------------------------------------------------------- #
 log "Starting AI engine on :${AI_ENGINE_PORT:-8100}"
-( cd "$ROOT/ai-engine" && ./.venv/bin/uvicorn datamind_ai.server:app \
+( cd "$ROOT/ai-engine" && PYTHONPATH=src ./.venv/bin/uvicorn datamind_ai.server:app \
     --host 0.0.0.0 --port "${AI_ENGINE_PORT:-8100}" \
     >"$ROOT/.run/ai-engine.log" 2>&1 ) &
 PIDS+=($!)
@@ -162,8 +162,9 @@ log "Starting backend on :${BACKEND_PORT:-8000}"
 PIDS+=($!)
 
 if $WITH_FRONTEND; then
-  if [[ ! -d "$ROOT/frontend/node_modules" ]]; then
-    log "Installing frontend dependencies (first run)"
+  if [[ ! -d "$ROOT/frontend/node_modules" ]] \
+     || [[ "$ROOT/frontend/package.json" -nt "$ROOT/frontend/node_modules" ]]; then
+    log "Installing frontend dependencies"
     ( cd "$ROOT/frontend" && npm install )
   fi
   log "Starting frontend on :3000"

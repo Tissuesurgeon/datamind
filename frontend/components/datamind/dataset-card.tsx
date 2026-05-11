@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Database, Sparkles, TrendingUp, Wallet2 } from "lucide-react";
+import { BadgeCheck, Database, Sparkles, TrendingUp, Wallet2 } from "lucide-react";
 
 import type { DatasetMarketplaceItem } from "@/types";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,14 @@ export function DatasetCard({
         <div className="absolute -top-2 right-4">
           <Badge variant="amber" className="gap-1">
             <TrendingUp className="h-3 w-3" /> Trending
+          </Badge>
+        </div>
+      )}
+
+      {dataset.onchain_id != null && (
+        <div className="absolute -top-2 left-4">
+          <Badge variant="magenta" className="gap-1" title="Dataset minted on-chain">
+            <BadgeCheck className="h-3 w-3" /> NFT
           </Badge>
         </div>
       )}

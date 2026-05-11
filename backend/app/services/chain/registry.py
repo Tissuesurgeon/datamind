@@ -17,6 +17,7 @@ from typing import Any
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.web3.contracts import load_abi as _load_abi_v2
 
 log = get_logger(__name__)
 
@@ -38,6 +39,12 @@ def _mock_tx(payload: str) -> str:
 
 
 def _load_abi() -> list[dict] | None:
+    # Delegate to the canonical loader in `app.web3.contracts` so we don't keep
+    # two copies of the same path glue. Falls back to the historical literal
+    # path for backwards compatibility with existing tooling.
+    abi = _load_abi_v2("DatasetRegistry")
+    if abi is not None:
+        return abi
     if not ABI_PATH.exists():
         return None
     try:

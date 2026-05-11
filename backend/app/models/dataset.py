@@ -28,6 +28,7 @@ class DatasetVisibility(str, enum.Enum):
 class DatasetStatus(str, enum.Enum):
     UPLOADING = "uploading"
     PROCESSING = "processing"
+    PENDING_CHAIN = "pending_chain"
     READY = "ready"
     FAILED = "failed"
 
@@ -105,6 +106,12 @@ class Dataset(IdMixin, TimestampMixin, Base):
     )
     analytics: Mapped["DatasetAnalytics | None"] = relationship(  # noqa: F821
         "DatasetAnalytics",
+        back_populates="dataset",
+        uselist=False,
+        cascade="all,delete-orphan",
+    )
+    nft: Mapped["DatasetNFT | None"] = relationship(  # noqa: F821
+        "DatasetNFT",
         back_populates="dataset",
         uselist=False,
         cascade="all,delete-orphan",

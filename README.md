@@ -6,7 +6,7 @@
 
 DataMind turns raw files into intelligent, discoverable, reusable AI assets — stored on **0G**, owned by you, monetizable on day one.
 
-[Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [0G Integration](docs/0G_INTEGRATION.md) · [Demo Flow](docs/DEMO.md)
+[Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [0G Integration](docs/0G_INTEGRATION.md) · [Demo Flow](docs/DEMO.md) · [Web3 Upgrade](docs/WEB3_UPGRADE.md) · [Deploy: Vercel + Railway](docs/DEPLOY_VERCEL_RAILWAY.md)
 
 </div>
 
@@ -83,6 +83,8 @@ Opens:
 - AI Engine → http://localhost:8100/docs
 
 If Docker isn't available, point `DATABASE_URL` / `QDRANT_URL` / `REDIS_URL` at hosted services and pass `--no-docker`.
+
+**Cloud deploy:** step-by-step [Vercel + Railway guide](docs/DEPLOY_VERCEL_RAILWAY.md).
 
 ### Manual setup
 

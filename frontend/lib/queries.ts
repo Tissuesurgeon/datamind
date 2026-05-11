@@ -13,6 +13,25 @@ import type {
   TrainingJob,
 } from "@/types";
 
+export type BackendChainConfig = {
+  chain_id: number;
+  rpc_url: string;
+  explorer_url: string | null;
+  contracts: Record<string, string | null>;
+  web3_user_tx: boolean;
+  indexer_enabled: boolean;
+  og_mock: boolean;
+  chain_live: boolean;
+};
+
+export function useBackendChainConfig() {
+  return useQuery({
+    queryKey: ["backend-chain-config"],
+    queryFn: () => api.get<BackendChainConfig>("/web3/config", { auth: false }),
+    staleTime: 60_000,
+  });
+}
+
 // ----- Datasets ------------------------------------------------------------
 
 export function useDatasets(opts: { mine?: boolean; category?: string } = {}) {
@@ -26,11 +45,23 @@ export function useDatasets(opts: { mine?: boolean; category?: string } = {}) {
   });
 }
 
-export function useDataset(id: string | null | undefined) {
+export function useDataset(
+  id: string | null | undefined,
+  opts?: { refetchWhileProcessing?: boolean }
+) {
+  const poll = opts?.refetchWhileProcessing ?? false;
   return useQuery({
-    queryKey: ["dataset", id],
+    queryKey: ["dataset", id, poll],
     enabled: Boolean(id),
     queryFn: () => api.get<DatasetDetail>(`/datasets/${id}`),
+    refetchInterval: (q) => {
+      if (!poll) return false;
+      const s = q.state.data?.status;
+      if (s === "uploading" || s === "processing" || s === "pending_chain") {
+        return 2500;
+      }
+      return false;
+    },
   });
 }
 
@@ -38,9 +69,10 @@ export function useUploadDataset() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fd: FormData) => api.upload<DatasetUploadResponse>("/datasets", fd),
-    onSuccess: () => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["datasets"] });
       qc.invalidateQueries({ queryKey: ["marketplace"] });
+      qc.invalidateQueries({ queryKey: ["dataset", res.dataset.id] });
     },
   });
 }

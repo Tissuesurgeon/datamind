@@ -57,3 +57,22 @@ class TrainingJobOut(BaseModel):
     config: dict
     created_at: datetime
     updated_at: datetime
+    contract_job_id: int | None = None
+    chain_start_tx_hash: str | None = None
+    chain_complete_tx_hash: str | None = None
+
+
+class TrainingChainStartConfirm(BaseModel):
+    """User-signed `TrainingRegistry.createTrainingJob` receipt."""
+
+    contract_job_id: int
+    tx_hash: str
+    chain_id: int | None = None
+
+
+class TrainingChainCompleteConfirm(BaseModel):
+    """User-signed `TrainingRegistry.completeTrainingJob` receipt."""
+
+    tx_hash: str
+    checkpoint_root: str | None = None
+    chain_id: int | None = None
