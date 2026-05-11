@@ -1,288 +1,291 @@
-# Deploy DataMind: Vercel + Railway (step by step)
+# Deploy DataMind on Vercel + Railway
 
-This guide walks you through putting **DataMind** online:
+This guide deploys **DataMind** as a split stack:
 
-- **Railway** hosts the **API** (FastAPI), talking to **Postgres**, **Redis**, and **Qdrant**.
-- **Vercel** hosts the **website** (Next.js).
+| Layer | Host | Role |
+|-------|------|------|
+| **Frontend** | [Vercel](https://vercel.com) | Next.js (marketplace, upload UI, RainbowKit) |
+| **Backend** | [Railway](https://railway.app) | FastAPI, Alembic migrations, WebSocket pub/sub |
+| **Data** | Railway + managed services | Postgres, Redis; Qdrant Cloud or self-hosted Qdrant |
 
-You will do **Railway first**, then **Vercel**, because the website needs your API’s public URL.
-
----
-
-## 1. What you need before you start
-
-1. A **GitHub** account and your DataMind code pushed to a **GitHub repository**.
-2. A **Railway** account ([railway.app](https://railway.app)) — sign up with GitHub.
-3. A **Vercel** account ([vercel.com](https://vercel.com)) — sign up with GitHub.
-
-**Terms:**
-
-- **Environment variables** — settings your app reads at runtime (passwords, URLs). You paste them into Railway/Vercel dashboards; do **not** commit real secrets to GitHub.
-- **Public URL** — the `https://…` address users open in a browser.
+Do **Railway first**, then **Vercel** — the UI needs a stable **`NEXT_PUBLIC_*` / `BACKEND_INTERNAL_URL`** pointing at the API.
 
 ---
 
-## 2. Big picture (simple)
+## 1. Prerequisites
+
+1. DataMind pushed to a **GitHub** repository.
+2. **Railway** and **Vercel** accounts (GitHub login is fine).
+3. Understand **environment variables**: you paste secrets in each dashboard; never commit a real `.env` to Git.
+
+**Browser → API:** The frontend must call your Railway hostname (not `localhost`). **CORS** on the backend must list your Vercel origin(s).
+
+---
+
+## 2. Architecture (short)
 
 ```
-User browser
-    → opens https://your-app.vercel.app (Vercel, Next.js)
-    → calls your API at https://your-api.up.railway.app (Railway, FastAPI)
-    → API uses Postgres / Redis / Qdrant on Railway (or Qdrant Cloud)
+Browser  ──►  https://your-app.vercel.app     (Next.js)
+                  │
+                  ├─► /api/proxy/*  ──►  https://your-api.up.railway.app/api/v1/*   (optional same-origin REST)
+                  └─► wss://your-api…/ws    (WebSockets — must be explicit; see §B3)
+Backend  ──►  Postgres, Redis, Qdrant
 ```
 
-**Connect wallet** needs the browser to reach the API and the API to allow your Vercel domain (CORS).
+**Upload pipeline (today’s code):** analyze + embed via **`AI_ENGINE_URL`**, vectors in **Qdrant**, optional **0G Storage** (mock or live), then **on-chain** steps if Web3 is enabled.
 
 ---
 
-## Part A — Railway (backend + database)
+## Part A — Railway (API + Postgres + Redis)
 
-### Step A1. Create a Railway project
+### A1. Create the project
 
-1. Log in to [Railway](https://railway.app).
-2. Click **New Project**.
-3. Choose **Deploy from GitHub repo** and select your **DataMind** repository.
-4. Railway may create an empty service — you will add **Postgres**, **Redis**, and a **Docker** service for the API.
+1. Railway → **New Project** → **Deploy from GitHub repo** → select DataMind.
 
-### Step A2. Add PostgreSQL
+### A2. PostgreSQL
 
-1. In the project, click **+ New**.
-2. Choose **Database** → **PostgreSQL**.
-3. Wait until it finishes provisioning.
-4. Click the **Postgres** service → **Variables**.
-5. Find **`DATABASE_URL`** (it is created for you).  
-   **Important:** Railway’s URL often starts with `postgresql://`. This project needs **`asyncpg`**.
+1. **+ New** → **Database** → **PostgreSQL**.
+2. Open Postgres → **Variables** → copy **`DATABASE_URL`**.
+3. **Normalize for asyncpg:** if the URL starts with `postgresql://`, change it to **`postgresql+asyncpg://`** (insert `+asyncpg`).
+   - Example: `postgresql+asyncpg://user:pass@host:5432/railway`
 
-   - Copy the value.
-   - Change the start from `postgresql://` to **`postgresql+asyncpg://`** (add `+asyncpg` after `postgresql`).
-   - Example:  
-     `postgresql+asyncpg://user:pass@host:5432/railway`
+### A3. Redis
 
-You will paste this fixed URL into the **backend** service variables in Step A5.
+1. **+ New** → **Database** → **Redis**.
+2. Copy **`REDIS_URL`** (or Railway’s private Redis URL) for **internal** use by the backend.
 
-### Step A3. Add Redis
+### A4. Qdrant (vectors)
 
-1. Click **+ New** → **Database** → **Redis**.
-2. Open the Redis service → **Variables** and copy **`REDIS_URL`** (or **`REDIS_PRIVATE_URL`** if that is what Railway shows — use the URL meant for internal TCP connections inside Railway).
+Embeddings are stored in Qdrant **every** upload path that runs the indexer.
 
-You will set **`REDIS_URL`** on the backend to this value.
+- **Recommended:** [Qdrant Cloud](https://cloud.qdrant.io) → cluster URL + optional **`QDRANT_API_KEY`**.
+- **Alternative:** run Qdrant on Railway from a template and point **`QDRANT_URL`** at it.
 
-### Step A4. Add Qdrant (vectors)
+### A5. Backend service (Docker)
 
-Qdrant stores search embeddings. Easiest options:
+1. **+ New** → connect the **same** GitHub repo.
+2. **Settings:**
+   - **Dockerfile path:** `docker/backend.Dockerfile`
+   - **Root directory:** repository root ( **`.`** — not `backend/`), because the Dockerfile copies `backend/` into the image itself.
 
-**Option 1 — Qdrant Cloud (simple for beginners)**  
-1. Sign up at [cloud.qdrant.io](https://cloud.qdrant.io).  
-2. Create a free cluster and copy the **HTTPS URL** and **API key** (if any).  
-3. You will set **`QDRANT_URL`** (and **`QDRANT_API_KEY`** if required).
+3. **Variables** (Production) — core set:
 
-**Option 2 — Another Qdrant on Railway**  
-1. In Railway, **+ New** → **Template** and search for **Qdrant**, or deploy a Qdrant service from a community template.  
-2. Copy the internal or public URL Railway gives you into **`QDRANT_URL`**.
-
-For a first deploy, **Option 1** is usually the least confusing.
-
-### Step A5. Deploy the FastAPI backend (Docker)
-
-1. Click **+ New** → **GitHub Repo** → pick the **same** DataMind repo (or **Empty Service** and connect the repo).
-2. Open the new service → **Settings**:
-   - **Build** → **Dockerfile path:** `docker/backend.Dockerfile`
-   - **Root directory:** leave as **repository root** (`.` / blank), not `backend/`, because the Dockerfile expects the whole repo.
-3. Open **Variables** and add (replace placeholders with your real values):
-
-| Variable | What to put |
-|----------|-------------|
-| `DATABASE_URL` | Your Postgres URL with **`postgresql+asyncpg://`** (see Step A2). |
-| `REDIS_URL` | From the Redis service (Step A3). |
-| `QDRANT_URL` | Your Qdrant HTTPS URL, e.g. `https://xxxx.cloud.qdrant.io` |
-| `QDRANT_API_KEY` | If your Qdrant cluster uses an API key; else leave empty. |
+| Variable | Value |
+|----------|--------|
+| `DATABASE_URL` | Postgres URL with **`postgresql+asyncpg://`** |
+| `REDIS_URL` | From Redis service |
+| `QDRANT_URL` | `https://…` (Cloud) or internal URL |
+| `QDRANT_API_KEY` | If required; else empty |
 | `DATAMIND_ENV` | `production` |
-| `BACKEND_JWT_SECRET` | A long random string (at least 32 characters). Generate one and keep it secret. |
-| `BACKEND_PUBLIC_URL` | Will update after deploy — temporarily `http://localhost:8000`, then set to your Railway **public API URL** (Step A6). |
-| `AI_ENGINE_URL` | For a **minimal** deploy you can point this at your API host with a placeholder port you don’t use yet, or deploy the AI engine later. Many hackathon flows work if you add a second Railway service for `ai-engine` later. *Simplest first path:* use a second service only when you need training/embeddings at scale. |
+| `BACKEND_JWT_SECRET` | Random string, **≥ 32 characters** |
+| `BACKEND_PUBLIC_URL` | `https://YOUR-RAILWAY-HOST` (no `/api/v1`; set after first deploy — **A6**) |
+| `BACKEND_CORS_ORIGINS` | Your Vercel origin(s), comma-separated, **no spaces** (e.g. `https://app.vercel.app`) |
+| `AI_ENGINE_URL` | **Required for real uploads:** URL of the AI engine service (see **§6**). Without it, ingest that depends on analyze/embed will fail. |
 
-4. **CORS (needed so Vercel can call the API):**  
-   After you have your Vercel URL (Part B), come back and set:
+The container runs **`alembic upgrade head`** then **`uvicorn`** (see `docker/backend.Dockerfile`).
 
-   | Variable | Example |
-   |----------|---------|
-   | `BACKEND_CORS_ORIGINS` | `https://your-app.vercel.app` |
+### A6. Public URL + health check
 
-   Use **no spaces** between origins. Multiple sites:  
-   `https://app.vercel.app,https://www.yourdomain.com`
-
-5. Click **Deploy** (or save variables — Railway redeploys).
-
-### Step A6. Get your API public URL
-
-1. Open the **backend** service → **Settings** → **Networking**.
-2. Click **Generate Domain** (or attach a custom domain).
-3. Copy the URL, e.g. `https://datamind-api-production.up.railway.app`.
-4. Your REST API base path includes **`/api/v1`**. So your **API base** is:
-
-   `https://YOUR-RAILWAY-HOST/api/v1`
-
-5. Go back to **Variables** and set:
-
-   - `BACKEND_PUBLIC_URL` → `https://YOUR-RAILWAY-HOST` (no `/api/v1` required here).
-
-6. Quick test in a browser or terminal:
+1. Backend service → **Settings** → **Networking** → **Generate Domain**.
+2. Example host: `https://datamind-api-production.up.railway.app`.
+3. Set **`BACKEND_PUBLIC_URL`** to that origin (scheme + host, no trailing path).
+4. Smoke test:
 
    ```bash
-   curl https://YOUR-RAILWAY-HOST/health
+   curl -sS https://YOUR-RAILWAY-HOST/health
    ```
 
-   You should see JSON with `"status": "ok"` (or similar).
+   REST lives under **`/api/v1`** (e.g. `https://YOUR-RAILWAY-HOST/api/v1/datasets`).
 
-The backend Docker image already runs **`alembic upgrade head`** before starting the server, so database tables are created on deploy.
+### A7. 0G Storage (mock vs live)
 
-### Step A7. (Optional) Seed demo data
+Behavior is controlled by **`DATAMIND_OG_MOCK`** and **`OG_PRIVATE_KEY`** (see `.env.example`).
 
-To load sample datasets into Postgres:
+| Mode | `DATAMIND_OG_MOCK` | `OG_PRIVATE_KEY` | Behavior |
+|------|--------------------|------------------|----------|
+| **Mock (default)** | `1` (or omit) | optional | Deterministic roots; files mirrored under server storage. **Per-dataset salt** avoids duplicate `storageRoot` on-chain when the same file is uploaded again. |
+| **Live** | `0` | **Required** | Backend shells to **`infra/og-bridge/cli.mjs`** with `@0glabs/0g-ts-sdk` (Galileo RPC + indexer). |
 
-1. Railway → your backend service → **Shell** or use **Railway CLI** with the service context.
-2. From the app directory used in the container (usually `/app/backend`), run:
+**Docker caveat:** The stock **`docker/backend.Dockerfile`** copies **`backend/`** only; it does **not** install Node or bundle **`infra/og-bridge/`**. The Python **`og_client`** shells out to **`node …/infra/og-bridge/cli.mjs`** for **`DATAMIND_OG_MOCK=0`**, so **live 0G uploads on Railway need a custom backend image** (e.g. add Node, `COPY infra/og-bridge`, `npm ci` inside it) **or** equivalent changes to match your layout. The repo also has **`docker/og-bridge.Dockerfile`** for a standalone HTTP bridge used in Docker Compose; wiring production to that HTTP API would need code changes. For hosted demos, **`DATAMIND_OG_MOCK=1`** is the supported default.
 
-   ```bash
-   python -m app.scripts.seed
-   ```
+Also set when testing Galileo storage locally or on a custom image:
 
-If the shell starts in another folder, `cd` into the backend app root first (check with `ls`).
+| Variable | Typical value |
+|----------|----------------|
+| `OG_EVM_RPC` | `https://evmrpc-testnet.0g.ai` |
+| `OG_INDEXER_RPC` | `https://indexer-storage-testnet-turbo.0g.ai` |
 
----
+### A8. Web3 / on-chain (optional)
 
-## Part B — Vercel (frontend)
+For **user-signed** transactions (dataset **register** + **NFT mint** after upload), deploy contracts to **0G Galileo (chain id 16602)** and mirror addresses on backend + frontend.
 
-### Step B1. Import the project
+**Backend (Railway):**
 
-1. Log in to [Vercel](https://vercel.com).
-2. **Add New** → **Project** → **Import** your GitHub **DataMind** repo.
+| Variable | Notes |
+|----------|--------|
+| `DATAMIND_WEB3_USER_TX` | `1` = after storage, status **`pending_chain`** until the wallet completes txs + **`POST …/chain-confirm`** |
+| `DATASET_REGISTRY_ADDRESS` | From `forge script` |
+| `DATASET_NFT_ADDRESS` | |
+| `TRAINING_REGISTRY_ADDRESS` | |
+| `USAGE_ECONOMY_ADDRESS` | |
+| `LICENSE_REGISTRY_ADDRESS` | |
+| `OG_EVM_RPC` | Used by the optional chain indexer |
+| `DATAMIND_CHAIN_INDEXER` | `1` to poll **`eth_getLogs`** into Postgres; `0` to skip |
+| `DATAMIND_CHAIN_INDEXER_START_BLOCK` | Deployment block of your contracts |
+| `DATAMIND_CHAIN_INDEXER_POLL_SECONDS` | e.g. `5` |
 
-### Step B2. Configure the build
+`OG_PRIVATE_KEY` on the server is **not** used for user-signed registry/NFT calls; the **connected wallet** signs those. The key matters for **live 0G Storage** when **`DATAMIND_OG_MOCK=0`**.
 
-1. **Root Directory:** click **Edit** and set to **`frontend`**.  
-   This folder contains `package.json` for Next.js.
-2. **Framework Preset:** Next.js (auto-detected).
-3. **Build Command:** default (`npm run build` or `next build`).
-4. **Output:** default for Next.js.
+Details: [`docs/WEB3_UPGRADE.md`](WEB3_UPGRADE.md).
 
-### Step B3. Environment variables (Vercel)
+### A9. Seed demo data (optional)
 
-In **Environment Variables**, add **Production** (and Preview if you want):
-
-| Name | Value | Notes |
-|------|--------|------|
-| `BACKEND_INTERNAL_URL` | `https://YOUR-RAILWAY-HOST/api/v1` | Same as API base. Used server-side for `/api/proxy` rewrites so the browser does not need CORS for REST when using the proxy. |
-| `NEXT_PUBLIC_WS_BASE` | `wss://YOUR-RAILWAY-HOST/ws` | Change `https` → **`wss`**, path **`/ws`** (WebSockets cannot use `/api/proxy` the same way). |
-
-**Alternative (direct API, no proxy):**  
-Instead of relying on `/api/proxy`, you can set:
-
-- `NEXT_PUBLIC_API_BASE` = `https://YOUR-RAILWAY-HOST/api/v1`
-- `NEXT_PUBLIC_WS_BASE` = `wss://YOUR-RAILWAY-HOST/ws`
-
-Then **CORS** on Railway **must** include your Vercel URL (you already set `BACKEND_CORS_ORIGINS`).
-
-### Step B4. Deploy
-
-1. Click **Deploy**.
-2. When it finishes, open the **`.vercel.app`** URL Vercel shows.
-
-### Step B5. Finish CORS on Railway
-
-1. Copy your exact Vercel production URL, e.g. `https://datamind-xxx.vercel.app`.
-2. Railway → backend → **Variables** → **`BACKEND_CORS_ORIGINS`** = that URL (comma-separated if several).
-3. Redeploy if Railway does not pick it up automatically.
-
----
-
-## 3. Check that “Connect wallet” works
-
-1. Open your **Vercel** site.
-2. Open the browser **Developer Tools** → **Network**.
-3. Click **Connect wallet**.
-4. Find a request like **`privy/verify`** (or `auth/privy/verify`).
-5. It should be **200** and return JSON with `access_token`.
-
-**If it fails:**
-
-- **Blocked / CORS** — fix `BACKEND_CORS_ORIGINS` on Railway; include the exact Vercel origin (`https://…`, no trailing slash).
-- **Calls `localhost`** — on Vercel you must set **`BACKEND_INTERNAL_URL`** or **`NEXT_PUBLIC_API_BASE`** to your Railway URL (see B3).
-- **502 / connection** — Railway service asleep or wrong port; check Railway logs for the backend service.
-
----
-
-## 4. AI engine (optional, advanced)
-
-Training and some embedding-heavy flows expect **`AI_ENGINE_URL`** pointing at the separate **ai-engine** FastAPI service (`ai-engine/` in the repo). For a first deploy you can:
-
-- Skip it until you need training, **or**
-- Add **another Railway service** using `docker/ai-engine.Dockerfile` (same repo root context) and set `AI_ENGINE_URL` on the backend to that service’s URL.
-
----
-
-## 5. Quick reference — URLs
-
-| Purpose | Example shape |
-|--------|----------------|
-| API health | `https://YOUR-RAILWAY-HOST/health` |
-| API docs | `https://YOUR-RAILWAY-HOST/docs` |
-| API REST base | `https://YOUR-RAILWAY-HOST/api/v1` |
-| WebSocket base | `wss://YOUR-RAILWAY-HOST/ws` |
-| Website | `https://YOUR-PROJECT.vercel.app` |
-
----
-
-## 5b. Optional: deploy contracts first (live on-chain mode)
-
-If you want the **user-signed** Web3 flow (RainbowKit + NFT mint + on-chain
-training), deploy contracts to 0G Galileo **before** filling in production env
-vars:
+Railway backend → **Shell** (working directory should be app root as in the image):
 
 ```bash
-cd smart-contracts
-forge install
-forge build
-forge script script/Deploy.s.sol:Deploy \
-  --rpc-url https://evmrpc-testnet.0g.ai \
-  --private-key $OG_PRIVATE_KEY \
-  --broadcast
+cd /app/backend && python -m app.scripts.seed
 ```
 
-Copy the printed addresses into **both** sides:
+Adjust path if your shell opens elsewhere (`ls`, then `cd`).
 
-| Railway (backend) | Vercel (frontend) |
-|-------------------|--------------------|
-| `DATASET_REGISTRY_ADDRESS` | `NEXT_PUBLIC_DATASET_REGISTRY` |
-| `DATASET_NFT_ADDRESS` | `NEXT_PUBLIC_DATASET_NFT` |
-| `TRAINING_REGISTRY_ADDRESS` | `NEXT_PUBLIC_TRAINING_REGISTRY` |
-| `USAGE_ECONOMY_ADDRESS` | `NEXT_PUBLIC_USAGE_ECONOMY` |
-| `LICENSE_REGISTRY_ADDRESS` | `NEXT_PUBLIC_LICENSE_REGISTRY` |
+---
 
-Also set on Vercel:
+## Part B — Vercel (Next.js frontend)
 
-| Variable | Example |
-|---------|----------|
+### B1. Import
+
+**Add New** → **Project** → import the DataMind repo.
+
+### B2. Root directory & build
+
+| Setting | Value |
+|---------|--------|
+| **Root Directory** | **`frontend`** |
+| **Framework** | Next.js (auto) |
+| **Build** | Default `npm run build` |
+
+### B3. Environment variables
+
+Add at least **Production**; repeat for **Preview** if you use preview deploys.
+
+**Recommended (same-origin REST via rewrite):**
+
+| Name | Value |
+|------|--------|
+| `BACKEND_INTERNAL_URL` | `https://YOUR-RAILWAY-HOST/api/v1` |
+
+In **`next.config.ts`**, `/api/proxy/:path*` rewrites to this base. If **`NEXT_PUBLIC_API_BASE`** is unset on the client, the app uses **`/api/proxy`** in production (see `frontend/lib/env.ts`), so **`BACKEND_INTERNAL_URL`** must be set on Vercel.
+
+**WebSockets (required in production for live progress):** The proxy does **not** tunnel WebSockets. Set explicitly:
+
+| Name | Value |
+|------|--------|
+| `NEXT_PUBLIC_WS_BASE` | `wss://YOUR-RAILWAY-HOST/ws` |
+
+**Alternative:** Set **`NEXT_PUBLIC_API_BASE`** to `https://YOUR-RAILWAY-HOST/api/v1` and rely on **`BACKEND_CORS_ORIGINS`** including your Vercel URL. You still need **`NEXT_PUBLIC_WS_BASE`** for `wss://…/ws`.
+
+**(chain / Web3 UI)**
+
+| Name | Example / notes |
+|------|------------------|
+| `NEXT_PUBLIC_CHAIN_ID` | `16602` |
 | `NEXT_PUBLIC_OG_RPC_URL` | `https://evmrpc-testnet.0g.ai` |
 | `NEXT_PUBLIC_OG_EXPLORER_URL` | `https://chainscan-galileo.0g.ai` |
 | `NEXT_PUBLIC_OG_FAUCET_URL` | `https://faucet.0g.ai` |
-| `NEXT_PUBLIC_CHAIN_ID` | `16602` |
-| `NEXT_PUBLIC_WC_PROJECT_ID` | Your WalletConnect / Reown id (optional) |
+| `NEXT_PUBLIC_DATASET_REGISTRY` | Match backend `DATASET_REGISTRY_ADDRESS` |
+| `NEXT_PUBLIC_DATASET_NFT` | Match `DATASET_NFT_ADDRESS` |
+| `NEXT_PUBLIC_TRAINING_REGISTRY` | |
+| `NEXT_PUBLIC_USAGE_ECONOMY` | |
+| `NEXT_PUBLIC_LICENSE_REGISTRY` | |
+| `NEXT_PUBLIC_WC_PROJECT_ID` | Optional WalletConnect / Reown project id |
+| `NEXT_PUBLIC_PRIVY_APP_ID` | If using Privy in the browser; must align with backend `PRIVY_*` |
 
-Then on Railway add:
+Full list mirrors [`.env.example`](../.env.example).
 
-| Variable | Value |
-|---------|-------|
-| `DATAMIND_WEB3_USER_TX` | `1` |
-| `DATAMIND_CHAIN_INDEXER` | `1` |
-| `DATAMIND_CHAIN_INDEXER_START_BLOCK` | block height when contracts were deployed |
+### B4. Deploy & CORS
 
-See [`docs/WEB3_UPGRADE.md`](WEB3_UPGRADE.md) for the full flow.
+1. Deploy on Vercel.
+2. Copy the production URL (e.g. `https://datamind-xxx.vercel.app`).
+3. Railway backend → **`BACKEND_CORS_ORIGINS`** must include that **exact** origin (no trailing slash).
+4. Redeploy backend if variables do not hot-reload.
 
-## 6. Security reminders
+---
 
-- Never commit **`.env`** with real secrets.
-- Use a strong **`BACKEND_JWT_SECRET`** in production.
-- **Privy:** leave `PRIVY_APP_ID` empty for the built-in demo wallet, or configure Privy properly for real wallet login (see `.env.example`).
+## 3. Verify auth & API
 
-You’re done: **Railway = API + data**, **Vercel = UI**, **CORS + env URLs = working wallet and API calls.**
+1. Open the Vercel site; **DevTools** → **Network**.
+2. **Connect wallet** / complete any Privy flow.
+3. Confirm calls to your API (via **`/api/proxy`** or direct **`NEXT_PUBLIC_API_BASE`**) return **200**.
+
+**Common issues**
+
+| Symptom | Fix |
+|---------|-----|
+| CORS errors | Add Vercel origin to **`BACKEND_CORS_ORIGINS`**. |
+| Requests to `localhost` | Set **`BACKEND_INTERNAL_URL`** or **`NEXT_PUBLIC_API_BASE`**. |
+| Upload “stuck” without live updates | Set **`NEXT_PUBLIC_WS_BASE`** to **`wss://YOUR-RAILWAY-HOST/ws`**. |
+| 502 / timeouts | Railway logs; ensure the service listens on the port Railway expects (`8000` in the Dockerfile). |
+
+---
+
+## 4. AI engine (separate service)
+
+Uploads run **analyze** and **batch embed** against **`AI_ENGINE_URL`** (`ai-engine/` FastAPI in the repo). For production, add **another Railway service** from the same repo:
+
+- **Dockerfile path:** `docker/ai-engine.Dockerfile`.
+- Set **`AI_ENGINE_URL`** on the **backend** to that service’s **internal or public** base URL (e.g. `https://datamind-ai.up.railway.app`).
+
+Without a reachable AI engine, pipeline steps that call it will fail even if Postgres/Redis/Qdrant are fine.
+
+---
+
+## 5. URL quick reference
+
+| Purpose | URL |
+|---------|-----|
+| Health | `https://YOUR-RAILWAY-HOST/health` |
+| OpenAPI | `https://YOUR-RAILWAY-HOST/docs` |
+| REST base | `https://YOUR-RAILWAY-HOST/api/v1` |
+| WebSocket | `wss://YOUR-RAILWAY-HOST/ws` |
+| Frontend | `https://YOUR-PROJECT.vercel.app` |
+
+---
+
+## 6. Deploy contracts (Galileo)
+
+If you need the **full** on-chain demo:
+
+```bash
+cd smart-contracts
+forge install    # first time only
+forge build
+forge script script/Deploy.s.sol:Deploy \
+  --rpc-url https://evmrpc-testnet.0g.ai \
+  --private-key "$OG_PRIVATE_KEY" \
+  --broadcast
+```
+
+Paste printed addresses into Railway **and** Vercel (`DATASET_*` ↔ `NEXT_PUBLIC_DATASET_*`, etc.).
+
+Optional ABI sync for the frontend:
+
+```bash
+./scripts/export-abi.sh
+```
+
+---
+
+## 7. Security
+
+- Do not commit **`.env`** with real secrets (especially **`BACKEND_JWT_SECRET`**, **`OG_PRIVATE_KEY`**, **`PRIVY_APP_SECRET`**).
+- Rotate any key that ever appeared in a public repo.
+- Use strong **`BACKEND_JWT_SECRET`** in production.
+- **Privy:** for production wallet login, set **`PRIVY_APP_ID`** / **`PRIVY_APP_SECRET`** on the backend and **`NEXT_PUBLIC_PRIVY_APP_ID`** on Vercel; empty Privy envs fall back to demo/mock flows.
+
+---
+
+## 8. Related docs
+
+- [`.env.example`](../.env.example) — authoritative variable list
+- [`docs/WEB3_UPGRADE.md`](WEB3_UPGRADE.md) — contracts, indexer, user-tx flow
+- [`docs/0G_INTEGRATION.md`](0G_INTEGRATION.md) — 0G Storage behavior
