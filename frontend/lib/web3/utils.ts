@@ -19,7 +19,10 @@ export function addressUrl(addr?: string | null): string | null {
 }
 
 export function tokenUrl(contract: string, tokenId: string | number): string {
-  return `${OG_EXPLORER_URL.replace(/\/+$/, "")}/token/${contract}/instance/${tokenId}`;
+  const base = OG_EXPLORER_URL.replace(/\/+$/, "");
+  // 0G Galileo ChainScan is Routescan-style: /nft/{address}/{id}
+  // (not legacy Blockscout /token/{address}/instance/{id}.)
+  return `${base}/nft/${contract}/${tokenId}`;
 }
 
 export function ensure0x(hex: string): Hex {
