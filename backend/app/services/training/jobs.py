@@ -97,7 +97,7 @@ async def run_training(job_id: str) -> None:
     ckpt_path = ckpt_dir / f"{job_id}.json"
     ckpt_path.write_text(json.dumps(checkpoint_payload, indent=2))
 
-    og_result = await og_client.upload(ckpt_path)
+    og_result = await og_client.upload(ckpt_path, dedupe_salt=job_id)
 
     async with session_scope() as db:
         res = await db.execute(select(TrainingJob).where(TrainingJob.id == job_id))

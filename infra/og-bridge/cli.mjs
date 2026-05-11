@@ -15,8 +15,8 @@
  * Environment fallbacks for any missing flag:
  *   OG_EVM_RPC, OG_INDEXER_RPC, OG_PRIVATE_KEY
  *
- * The Python `og_client.py` shells to this binary; on any error it falls back
- * to a deterministic mock root so the demo never breaks.
+ * The Python `og_client.py` shells to this binary. In live mode it expects a
+ * JSON line with mode "live"; mock / fallback lines are treated as failures.
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";

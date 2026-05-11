@@ -1,6 +1,8 @@
 """0G Storage client.
 
-Mock-by-default: deterministic fake roots derived from the file's SHA-256.
+Mock-by-default: fake roots from SHA-256(file + optional salt). The salt avoids
+`DatasetAlreadyRegistered` on-chain when the same bytes are uploaded again (common
+in demos). Live mode ignores the salt.
 Live mode shells out to `infra/og-bridge/cli.mjs upload <path>` (ports the
 @0glabs/0g-ts-sdk bridge from `frxAi/tools/0g-storage-publish`).
 
@@ -50,16 +52,21 @@ async def warmup() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def _mock_root(payload: bytes) -> str:
-    """Stable, deterministic `0x…` root from the file payload."""
-    return "0x" + hashlib.sha256(payload).hexdigest()
+def _mock_root(payload: bytes, salt: str | None = None) -> str:
+    """Deterministic `0x…` root from file bytes, optionally namespaced by *salt*."""
+    h = hashlib.sha256()
+    h.update(payload)
+    if salt:
+        h.update(b"\x00")
+        h.update(salt.encode("utf-8"))
+    return "0x" + h.hexdigest()
 
 
 def _mock_tx(root: str) -> str:
     return "0x" + hashlib.sha256(("tx::" + root).encode()).hexdigest()
 
 
-async def upload(path: str | Path) -> dict[str, Any]:
+async def upload(path: str | Path, *, dedupe_salt: str | None = None) -> dict[str, Any]:
     p = Path(path)
     settings = get_settings()
     if not p.exists():
@@ -68,7 +75,7 @@ async def upload(path: str | Path) -> dict[str, Any]:
     if not settings.storage_live or not BRIDGE_CLI.exists():
         # Mock path — copy into local "0G mirror" + emit deterministic root.
         data = p.read_bytes()
-        root = _mock_root(data)
+        root = _mock_root(data, dedupe_salt)
         tx = _mock_tx(root)
         target = LOCAL_OG_ROOT / root.removeprefix("0x")
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -104,27 +111,24 @@ async def upload(path: str | Path) -> dict[str, Any]:
         cwd=str(REPO_ROOT),
     )
     stdout, stderr = await proc.communicate()
+    err_txt = stderr.decode("utf-8", "ignore")
     if proc.returncode != 0:
-        log.warning(
-            "og.upload.live.failed", code=proc.returncode, err=stderr.decode("utf-8", "ignore")
+        log.warning("og.upload.live.failed", code=proc.returncode, err=err_txt)
+        raise RuntimeError(
+            f"0G bridge upload failed (exit {proc.returncode}): {err_txt.strip() or 'no stderr'}"
         )
-        # Fall back to deterministic mock so the demo never breaks.
-        data = p.read_bytes()
-        return {
-            "root": _mock_root(data),
-            "tx_hash": _mock_tx(_mock_root(data)),
-            "size": len(data),
-            "mode": "mock-fallback",
-            "error": stderr.decode("utf-8", "ignore")[-512:],
-        }
 
     line = (stdout.decode("utf-8", "ignore").splitlines() or [""])[-1]
     try:
         data = json.loads(line)
     except json.JSONDecodeError:
-        log.warning("og.upload.bad-json", out=line)
-        data = {"root": _mock_root(p.read_bytes()), "tx_hash": "", "size": p.stat().st_size}
-    data.setdefault("mode", "live")
+        log.warning("og.upload.bad-json", out=line[:500])
+        raise RuntimeError(f"0G bridge did not return JSON: {line[:500]!r}") from None
+
+    mode = data.get("mode")
+    if mode != "live":
+        detail = data.get("reason") or data.get("error") or line
+        raise RuntimeError(f"0G Storage upload was not live (mode={mode!r}): {detail}")
     return data
 
 

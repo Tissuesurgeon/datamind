@@ -370,7 +370,7 @@ async def _seed() -> None:
             )
             db.add(file)
 
-            og = await og_client.upload(src)
+            og = await og_client.upload(src, dedupe_salt=d.id)
             d.storage_root = og["root"]
             d.storage_tx_hash = og.get("tx_hash")
             d.metadata_uri = f"0g://{og['root']}"

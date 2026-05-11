@@ -206,7 +206,7 @@ async def run_ingest_pipeline(dataset_id: str) -> None:
 
     # ---- Push to 0G Storage --------------------------------------------------
     await _publish(topic, EventType.STORAGE_PUSHING, {})
-    og_result = await og_client.upload(local_path)
+    og_result = await og_client.upload(local_path, dedupe_salt=dataset_id)
 
     # Upload a metadata manifest separately so the on-chain `metadataURI`
     # points to the descriptor, not the raw payload.
@@ -224,7 +224,9 @@ async def run_ingest_pipeline(dataset_id: str) -> None:
     }
     manifest_path = local_path.with_suffix(local_path.suffix + ".manifest.json")
     manifest_path.write_text(json.dumps(manifest, indent=2))
-    manifest_result = await og_client.upload(manifest_path)
+    manifest_result = await og_client.upload(
+        manifest_path, dedupe_salt=f"{dataset_id}:manifest"
+    )
     metadata_uri = f"0g://{manifest_result['root']}"
 
     # ---- Persist storage refs ------------------------------------------------
