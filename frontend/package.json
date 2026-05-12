@@ -45,6 +45,9 @@
     "zod": "^3.23.8",
     "zustand": "^5.0.2"
   },
+  "overrides": {
+    "lucide-react": "$lucide-react"
+  },
   "devDependencies": {
     "@types/node": "^22.10.1",
     "@types/react": "19.0.1",
