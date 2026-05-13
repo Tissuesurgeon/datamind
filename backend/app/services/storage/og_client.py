@@ -42,7 +42,13 @@ async def warmup() -> None:
     settings = get_settings()
     LOCAL_OG_ROOT.mkdir(parents=True, exist_ok=True)
     if settings.storage_live:
-        log.info("og.mode", live=True, indexer=settings.og_indexer_rpc)
+        if not BRIDGE_CLI.exists():
+            log.warning(
+                "og.bridge.missing",
+                expected=str(BRIDGE_CLI),
+                hint="Rebuild backend image with infra/og-bridge + Node or use DATAMIND_OG_MOCK=1",
+            )
+        log.info("og.mode", live=True, indexer=settings.og_indexer_rpc, bridge=str(BRIDGE_CLI))
     else:
         log.info("og.mode", live=False, reason="DATAMIND_OG_MOCK or no key")
 
@@ -72,7 +78,7 @@ async def upload(path: str | Path, *, dedupe_salt: str | None = None) -> dict[st
     if not p.exists():
         raise FileNotFoundError(p)
 
-    if not settings.storage_live or not BRIDGE_CLI.exists():
+    if not settings.storage_live:
         # Mock path — copy into local "0G mirror" + emit deterministic root.
         data = p.read_bytes()
         root = _mock_root(data, dedupe_salt)
@@ -87,6 +93,14 @@ async def upload(path: str | Path, *, dedupe_salt: str | None = None) -> dict[st
             "size": len(data),
             "mode": "mock",
         }
+
+    if not BRIDGE_CLI.exists():
+        log.error("og.bridge.missing", path=str(BRIDGE_CLI))
+        raise RuntimeError(
+            "Live 0G Storage is enabled (DATAMIND_OG_MOCK=0 with OG_PRIVATE_KEY) but "
+            f"the Node bridge is missing at {BRIDGE_CLI}. Rebuild the backend Docker "
+            "image so it includes infra/og-bridge and Node.js, or set DATAMIND_OG_MOCK=1."
+        )
 
     # Live path — shell to node bridge. Bridge prints a single JSON line.
     cmd = [
@@ -149,7 +163,11 @@ async def download(root: str) -> Path | None:
     if target.exists():
         return target
 
-    if not settings.storage_live or not BRIDGE_CLI.exists():
+    if not settings.storage_live:
+        return None
+
+    if not BRIDGE_CLI.exists():
+        log.warning("og.download.bridge.missing", path=str(BRIDGE_CLI))
         return None
 
     log.info("og.download.live", root=root)

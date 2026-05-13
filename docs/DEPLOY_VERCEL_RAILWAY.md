@@ -106,7 +106,9 @@ Behavior is controlled by **`DATAMIND_OG_MOCK`** and **`OG_PRIVATE_KEY`** (see `
 | **Mock (default)** | `1` (or omit) | optional | Deterministic roots; files mirrored under server storage. **Per-dataset salt** avoids duplicate `storageRoot` on-chain when the same file is uploaded again. |
 | **Live** | `0` | **Required** | Backend shells to **`infra/og-bridge/cli.mjs`** with `@0glabs/0g-ts-sdk` (Galileo RPC + indexer). |
 
-**Docker caveat:** The stock **`docker/backend.Dockerfile`** copies **`backend/`** only; it does **not** install Node or bundle **`infra/og-bridge/`**. The Python **`og_client`** shells out to **`node …/infra/og-bridge/cli.mjs`** for **`DATAMIND_OG_MOCK=0`**, so **live 0G uploads on Railway need a custom backend image** (e.g. add Node, `COPY infra/og-bridge`, `npm ci` inside it) **or** equivalent changes to match your layout. The repo also has **`docker/og-bridge.Dockerfile`** for a standalone HTTP bridge used in Docker Compose; wiring production to that HTTP API would need code changes. For hosted demos, **`DATAMIND_OG_MOCK=1`** is the supported default.
+**Docker image:** The **`docker/backend.Dockerfile`** installs **Node.js 20**, copies **`infra/og-bridge/`**, and runs **`npm ci`** there. After you **rebuild and redeploy** the backend on Railway, set **`DATAMIND_OG_MOCK=0`**, **`OG_PRIVATE_KEY`** (funded on Galileo for storage fees), **`OG_EVM_RPC`**, and **`OG_INDEXER_RPC`**. Startup logs should show **`og.mode`** with **`live=True`** and a **`bridge`** path under **`/app/infra/og-bridge/cli.mjs`**.
+
+If live mode is enabled but the bridge is missing (old image), uploads **fail with a clear error** instead of silently using mock storage.
 
 Also set when testing Galileo storage locally or on a custom image:
 

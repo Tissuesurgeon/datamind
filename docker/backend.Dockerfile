@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     libmagic1 \
+    ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # ---- Deps stage --------------------------------------------------------- #
@@ -22,6 +25,12 @@ RUN pip install --upgrade pip wheel \
 
 # ---- Runtime ------------------------------------------------------------ #
 FROM deps AS runtime
+# 0G Storage: Node bridge (@0glabs/0g-ts-sdk) — required when DATAMIND_OG_MOCK=0
+COPY infra/og-bridge /app/infra/og-bridge
+WORKDIR /app/infra/og-bridge
+RUN npm ci --omit=dev --no-audit --no-fund \
+    || npm install --omit=dev --no-audit --no-fund
+
 COPY backend/ /app/backend/
 COPY .env.example /app/.env.example
 WORKDIR /app/backend
