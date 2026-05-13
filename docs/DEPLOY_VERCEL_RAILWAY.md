@@ -158,11 +158,24 @@ Adjust path if your shell opens elsewhere (`ls`, then `cd`).
 
 ### B2. Root directory & build
 
+**Important:** This repo has **no** `package.json` at the **repository root** — only under **`frontend/`**. If Vercel’s **Root Directory** is left as `.`, the build will fail (wrong working directory, missing Next.js, or empty install).
+
 | Setting | Value |
 |---------|--------|
-| **Root Directory** | **`frontend`** |
+| **Root Directory** | **`frontend`** (Project → Settings → General → *Root Directory*) |
 | **Framework** | Next.js (auto) |
-| **Build** | Default `npm run build` |
+| **Install Command** | leave default (`npm install` or `npm ci` **inside** `frontend/`) |
+| **Build Command** | default `npm run build` |
+
+After changing Root Directory, trigger a **new deployment** (Redeploy).
+
+**Optional check locally** (same as Vercel):
+
+```bash
+cd frontend && npm ci && npm run build
+```
+
+If that succeeds on your machine but Vercel still fails, open the failed deployment → **Build Logs** and scroll to the **first** `Error:` line; that message is what to fix next.
 
 ### B3. Environment variables
 
@@ -225,6 +238,7 @@ Full list mirrors [`.env.example`](../.env.example).
 | Requests to `localhost` | Set **`BACKEND_INTERNAL_URL`** or **`NEXT_PUBLIC_API_BASE`**. |
 | Upload “stuck” without live updates | Set **`NEXT_PUBLIC_WS_BASE`** to **`wss://YOUR-RAILWAY-HOST/ws`**. |
 | 502 / timeouts | Railway logs; ensure the service listens on the port Railway expects (`8000` in the Dockerfile). |
+| **`npm run build` fails on Vercel** | Set **Root Directory** to **`frontend`** (see §B2). Confirm `cd frontend && npm ci && npm run build` passes locally. |
 
 ---
 
