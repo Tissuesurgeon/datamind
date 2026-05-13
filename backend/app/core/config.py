@@ -46,6 +46,13 @@ class Settings(BaseSettings):
         default="http://localhost:3000,http://127.0.0.1:3000",
         alias="BACKEND_CORS_ORIGINS",
     )
+    # Regex for allowed Origin (e.g. Vercel previews). Starlette returns 400 on
+    # OPTIONS preflight when Origin matches neither this regex nor BACKEND_CORS_ORIGINS.
+    # Set to "-" or empty to disable (explicit origins only).
+    cors_origin_regex: str = Field(
+        default=r"https://.*\.vercel\.app",
+        alias="BACKEND_CORS_ORIGIN_REGEX",
+    )
 
     # --- Auth --------------------------------------------------------------
     jwt_secret: SecretStr = Field(
@@ -143,7 +150,20 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
+        # Browsers send Origin without trailing slash; strip so lists match.
+        out: list[str] = []
+        for o in self.cors_origins_raw.split(","):
+            s = o.strip().rstrip("/")
+            if s:
+                out.append(s)
+        return out
+
+    @property
+    def cors_origin_regex_effective(self) -> str | None:
+        r = (self.cors_origin_regex or "").strip()
+        if not r or r in ("-", "0", "false", "off", "no"):
+            return None
+        return r
 
     @property
     def chain_live(self) -> bool:

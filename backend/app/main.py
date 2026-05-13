@@ -7,6 +7,7 @@ Run with:
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,14 +69,17 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.add_middleware(SlowAPIMiddleware)
-    app.add_middleware(
-        CORSMiddleware,
+    cors_kw: dict[str, Any] = dict(
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["X-Request-Id"],
     )
+    _rx = settings.cors_origin_regex_effective
+    if _rx:
+        cors_kw["allow_origin_regex"] = _rx
+    app.add_middleware(CORSMiddleware, **cors_kw)
 
     @app.get("/health", response_model=HealthOut, tags=["meta"])
     async def health() -> HealthOut:

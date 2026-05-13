@@ -238,7 +238,7 @@ Full list mirrors [`.env.example`](../.env.example).
 | Requests to `localhost` | Set **`BACKEND_INTERNAL_URL`** or **`NEXT_PUBLIC_API_BASE`**. |
 | Upload “stuck” without live updates | Set **`NEXT_PUBLIC_WS_BASE`** to **`wss://YOUR-RAILWAY-HOST/ws`**. |
 | 502 / timeouts | Railway logs; ensure the service listens on the port Railway expects (`8000` in the Dockerfile). |
-| **`npm run build` fails on Vercel** | Set **Root Directory** to **`frontend`** (see §B2). Confirm `cd frontend && npm ci && npm run build` passes locally. |
+| **`OPTIONS …/auth/privy/verify` → 400** | The browser’s **`Origin`** was not allowed. The API now defaults to **`allow_origin_regex`** matching **`https://*.vercel.app`** (see `BACKEND_CORS_ORIGIN_REGEX`). Also add your **exact** frontend URL(s) to **`BACKEND_CORS_ORIGINS`** (no trailing slash), especially for a **custom domain**. Redeploy the backend after changing env. |
 
 ---
 
