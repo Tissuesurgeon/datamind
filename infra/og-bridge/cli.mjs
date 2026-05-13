@@ -78,12 +78,16 @@ async function loadSdk() {
 async function cmdUpload(args) {
   const file = args.file || args.f;
   if (!file) {
-    emit({ error: "usage", detail: "upload --file <path>" });
+    const detail = { error: "usage", detail: "upload --file <path>" };
+    console.error(JSON.stringify(detail));
+    emit(detail);
     process.exit(2);
   }
   const path = resolve(file);
   if (!existsSync(path)) {
-    emit({ error: "not_found", detail: path });
+    const detail = { error: "not_found", detail: path };
+    console.error(JSON.stringify(detail));
+    emit(detail);
     process.exit(2);
   }
   const buf = readFileSync(path);

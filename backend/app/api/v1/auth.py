@@ -82,6 +82,12 @@ async def verify_privy(req: PrivyVerifyRequest, db: DBSession) -> TokenResponse:
     settings = get_settings()
     wallet = (req.wallet_address or "").strip()
 
+    if settings.privy_live and _is_demo_privy_token(req.privy_token) and settings.privy_reject_demo_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="demo Privy token is disabled; use a real Privy identity token",
+        )
+
     # Live Privy JWKS verification only for real identity tokens. When the app
     # id is set in production but the UI still uses the bundled mock wallet,
     # the client sends privy_token="mock" — treat that like demo mode so deploys

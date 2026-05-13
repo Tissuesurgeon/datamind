@@ -24,7 +24,11 @@ async def save_upload(file: UploadFile, dataset_id: str) -> tuple[Path, str, int
     settings = get_settings()
     if not file.filename:
         raise HTTPException(status_code=400, detail="missing filename")
-    ext = Path(file.filename).suffix.lower()
+    # Never trust client path segments — only the final name (prevents ../../../ escapes).
+    safe_name = Path(file.filename).name
+    if not safe_name or safe_name in (".", ".."):
+        raise HTTPException(status_code=400, detail="invalid filename")
+    ext = Path(safe_name).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -33,7 +37,7 @@ async def save_upload(file: UploadFile, dataset_id: str) -> tuple[Path, str, int
 
     target_dir = settings.upload_dir / dataset_id
     target_dir.mkdir(parents=True, exist_ok=True)
-    target = target_dir / file.filename
+    target = target_dir / safe_name
 
     sha = hashlib.sha256()
     size = 0

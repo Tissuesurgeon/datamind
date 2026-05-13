@@ -73,7 +73,9 @@ def _mock_tx(root: str) -> str:
 
 
 async def upload(path: str | Path, *, dedupe_salt: str | None = None) -> dict[str, Any]:
-    p = Path(path)
+    # Absolute path required: bridge runs with cwd=REPO_ROOT (/app); uploads often live
+    # under /app/backend/storage_local when BACKEND_UPLOAD_DIR is relative.
+    p = Path(path).resolve()
     settings = get_settings()
     if not p.exists():
         raise FileNotFoundError(p)
@@ -126,10 +128,17 @@ async def upload(path: str | Path, *, dedupe_salt: str | None = None) -> dict[st
     )
     stdout, stderr = await proc.communicate()
     err_txt = stderr.decode("utf-8", "ignore")
+    out_txt = stdout.decode("utf-8", "ignore")
     if proc.returncode != 0:
-        log.warning("og.upload.live.failed", code=proc.returncode, err=err_txt)
+        detail = err_txt.strip() or out_txt.strip() or "no output"
+        log.warning(
+            "og.upload.live.failed",
+            code=proc.returncode,
+            err=err_txt[:2000],
+            out=out_txt[:2000],
+        )
         raise RuntimeError(
-            f"0G bridge upload failed (exit {proc.returncode}): {err_txt.strip() or 'no stderr'}"
+            f"0G bridge upload failed (exit {proc.returncode}): {detail}"
         )
 
     line = (stdout.decode("utf-8", "ignore").splitlines() or [""])[-1]
@@ -185,8 +194,14 @@ async def download(root: str) -> Path | None:
     proc = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
-    _stdout, stderr = await proc.communicate()
+    stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
-        log.warning("og.download.live.failed", err=stderr.decode("utf-8", "ignore"))
+        err = stderr.decode("utf-8", "ignore").strip()
+        out = stdout.decode("utf-8", "ignore").strip()
+        log.warning(
+            "og.download.live.failed",
+            err=err[:1500],
+            out=out[:1500],
+        )
         return None
     return target if target.exists() else None

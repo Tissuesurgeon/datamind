@@ -114,6 +114,9 @@ class Settings(BaseSettings):
     # --- Privy ------------------------------------------------------------
     privy_app_id: str | None = Field(default=None, alias="PRIVY_APP_ID")
     privy_app_secret: SecretStr | None = Field(default=None, alias="PRIVY_APP_SECRET")
+    # If true while PRIVY_APP_ID is set, `privy_token=mock|demo` is rejected (no wallet-spoof JWTs).
+    # Enable in production: DATAMIND_PRIVY_REJECT_DEMO_TOKEN=1
+    privy_reject_demo_token: bool = Field(default=False, alias="DATAMIND_PRIVY_REJECT_DEMO_TOKEN")
 
     # --- Web3 user-tx mode -------------------------------------------------
     # When true, the ingest pipeline stops short of server-signing the
@@ -143,6 +146,7 @@ class Settings(BaseSettings):
     @field_validator("upload_dir", mode="after")
     @classmethod
     def _ensure_upload_dir(cls, v: Path) -> Path:
+        v = v.resolve()
         v.mkdir(parents=True, exist_ok=True)
         return v
 
