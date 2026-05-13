@@ -3,8 +3,8 @@
 Mock-by-default: fake roots from SHA-256(file + optional salt). The salt avoids
 `DatasetAlreadyRegistered` on-chain when the same bytes are uploaded again (common
 in demos). Live mode ignores the salt.
-Live mode shells out to `infra/og-bridge/cli.mjs upload <path>` (ports the
-@0glabs/0g-ts-sdk bridge from `frxAi/tools/0g-storage-publish`).
+Live mode shells out to `infra/og-bridge/cli.mjs upload <path>` using
+`@0gfoundation/0g-storage-ts-sdk` (see https://build.0g.ai/storage/).
 
 Public surface:
     upload(path)        -> {root, tx_hash, size, mode}
@@ -151,7 +151,13 @@ async def upload(path: str | Path, *, dedupe_salt: str | None = None) -> dict[st
     mode = data.get("mode")
     if mode != "live":
         detail = data.get("reason") or data.get("error") or line
-        raise RuntimeError(f"0G Storage upload was not live (mode={mode!r}): {detail}")
+        raise RuntimeError(
+            f"0G Storage upload was not live (mode={mode!r}): {detail}. "
+            "If you intended live uploads: fund the server wallet (e.g. https://faucet.0g.ai), "
+            "set OG_EVM_RPC to https://evmrpc-testnet.0g.ai and OG_INDEXER_RPC to the turbo "
+            "testnet indexer from https://build.0g.ai/storage/, then redeploy the backend "
+            "image so /app/infra/og-bridge uses @0gfoundation/0g-storage-ts-sdk."
+        )
     return data
 
 

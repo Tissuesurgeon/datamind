@@ -25,7 +25,7 @@ RUN pip install --upgrade pip wheel \
 
 # ---- Runtime ------------------------------------------------------------ #
 FROM deps AS runtime
-# 0G Storage: Node bridge (@0glabs/0g-ts-sdk) — required when DATAMIND_OG_MOCK=0
+# 0G Storage: Node bridge (@0gfoundation/0g-storage-ts-sdk) — required when DATAMIND_OG_MOCK=0
 COPY infra/og-bridge /app/infra/og-bridge
 WORKDIR /app/infra/og-bridge
 RUN npm ci --omit=dev --no-audit --no-fund \

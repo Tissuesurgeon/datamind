@@ -104,7 +104,7 @@ Behavior is controlled by **`DATAMIND_OG_MOCK`** and **`OG_PRIVATE_KEY`** (see `
 | Mode | `DATAMIND_OG_MOCK` | `OG_PRIVATE_KEY` | Behavior |
 |------|--------------------|------------------|----------|
 | **Mock (default)** | `1` (or omit) | optional | Deterministic roots; files mirrored under server storage. **Per-dataset salt** avoids duplicate `storageRoot` on-chain when the same file is uploaded again. |
-| **Live** | `0` | **Required** | Backend shells to **`infra/og-bridge/cli.mjs`** with `@0glabs/0g-ts-sdk` (Galileo RPC + indexer). |
+| **Live** | `0` | **Required** | Backend shells to **`infra/og-bridge/cli.mjs`** with **`@0gfoundation/0g-storage-ts-sdk`** ([0G Storage](https://build.0g.ai/storage/)). |
 
 **Docker image:** The **`docker/backend.Dockerfile`** installs **Node.js 20**, copies **`infra/og-bridge/`**, and runs **`npm ci`** there. After you **rebuild and redeploy** the backend on Railway, set **`DATAMIND_OG_MOCK=0`**, **`OG_PRIVATE_KEY`** (funded on Galileo for storage fees), **`OG_EVM_RPC`**, and **`OG_INDEXER_RPC`**. Startup logs should show **`og.mode`** with **`live=True`** and a **`bridge`** path under **`/app/infra/og-bridge/cli.mjs`**.
 

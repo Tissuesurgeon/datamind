@@ -2,9 +2,11 @@
 /**
  * DataMind 0G Storage bridge.
  *
+ * Uses @0gfoundation/0g-storage-ts-sdk (see https://build.0g.ai/storage/).
+ *
  * Subcommands:
  *   upload   --file <path>  [--rpc] [--indexer] [--key]
- *      Stdout (single JSON line): {root, tx_hash, size}
+ *      Stdout (single JSON line): {root, tx_hash, size, mode}
  *
  *   download --root <0x..>  --out <path> [--indexer]
  *      Stdout (single JSON line): {ok: true, path}
@@ -14,18 +16,11 @@
  *
  * Environment fallbacks for any missing flag:
  *   OG_EVM_RPC, OG_INDEXER_RPC, OG_PRIVATE_KEY
- *
- * The Python `og_client.py` shells to this binary. In live mode it expects a
- * JSON line with mode "live"; mock / fallback lines are treated as failures.
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import http from "node:http";
-
-// ---------------------------------------------------------------------------
-// Argument parser
-// ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
   const out = {};
@@ -57,23 +52,58 @@ function deterministicTx(root) {
   return "0x" + createHash("sha256").update("tx::" + root).digest("hex");
 }
 
-// ---------------------------------------------------------------------------
-// Lazy SDK loader — keeps the bridge usable in mock mode without npm install.
-// ---------------------------------------------------------------------------
-
 async function loadSdk() {
   try {
-    const sdk = await import("@0glabs/0g-ts-sdk");
+    const sdk = await import("@0gfoundation/0g-storage-ts-sdk");
     const { ethers } = await import("ethers");
     return { sdk, ethers };
-  } catch (e) {
+  } catch (_e) {
     return null;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Upload
-// ---------------------------------------------------------------------------
+/** @returns {{ root: string, tx_hash: string, size: number }} */
+async function liveUploadFile(absPath, rpc, indexerUrl, pk) {
+  const { ZgFile, Indexer } = await import("@0gfoundation/0g-storage-ts-sdk");
+  const { ethers } = await import("ethers");
+  const buf = readFileSync(absPath);
+  const zgFile = await ZgFile.fromFilePath(absPath);
+  try {
+    const provider = new ethers.JsonRpcProvider(rpc);
+    const wallet = new ethers.Wallet(pk, provider);
+    const idx = new Indexer(indexerUrl);
+    const [result, uploadErr] = await idx.upload(zgFile, rpc, wallet);
+    if (uploadErr) {
+      throw new Error("upload: " + (uploadErr.message || String(uploadErr)));
+    }
+    let root = "";
+    let tx_hash = "";
+    if (result && typeof result === "object") {
+      if ("rootHash" in result && result.rootHash) {
+        root = String(result.rootHash);
+        tx_hash = String(result.txHash || "");
+      } else if (
+        "rootHashes" in result &&
+        Array.isArray(result.rootHashes) &&
+        result.rootHashes.length
+      ) {
+        root = String(result.rootHashes[0]);
+        const txs = result.txHashes;
+        tx_hash = txs && txs.length ? String(txs[0]) : "";
+      }
+    }
+    if (!root) {
+      throw new Error("upload: indexer returned no rootHash");
+    }
+    return { root, tx_hash, size: buf.length };
+  } finally {
+    try {
+      await zgFile.close();
+    } catch (_e) {
+      /* ignore */
+    }
+  }
+}
 
 async function cmdUpload(args) {
   const file = args.file || args.f;
@@ -114,38 +144,14 @@ async function cmdUpload(args) {
       tx_hash: deterministicTx(deterministicRoot(buf)),
       size: buf.length,
       mode: "mock",
-      reason: "@0glabs/0g-ts-sdk not installed",
+      reason: "@0gfoundation/0g-storage-ts-sdk not installed",
     });
     return;
   }
 
-  const { sdk, ethers } = loaded;
   try {
-    const ZgFile = sdk.ZgFile || sdk.default?.ZgFile;
-    const Indexer = sdk.Indexer || sdk.default?.Indexer;
-    if (!ZgFile || !Indexer) {
-      throw new Error("ZgFile/Indexer not exported by SDK");
-    }
-    const zgFile = await ZgFile.fromFilePath(path);
-    const [tree, merkleErr] = await zgFile.merkleTree();
-    if (merkleErr) throw new Error("merkleTree: " + merkleErr);
-    const root = tree.rootHash();
-
-    const provider = new ethers.JsonRpcProvider(rpc);
-    const wallet = new ethers.Wallet(pk, provider);
-    const idx = new Indexer(indexer);
-    const [tx, uploadErr] = await idx.upload(zgFile, rpc, wallet);
-    if (uploadErr) throw new Error("upload: " + (uploadErr.message || uploadErr));
-
-    let tx_hash = "";
-    if (tx && typeof tx === "object") {
-      tx_hash = String(tx.hash || tx.txHash || tx.transactionHash || "");
-    } else if (tx) {
-      tx_hash = String(tx);
-    }
-
-    await zgFile.close();
-    emit({ root, tx_hash, size: buf.length, mode: "live" });
+    const { root, tx_hash, size } = await liveUploadFile(path, rpc, indexer, pk);
+    emit({ root, tx_hash, size, mode: "live" });
   } catch (e) {
     emit({
       root: deterministicRoot(buf),
@@ -156,10 +162,6 @@ async function cmdUpload(args) {
     });
   }
 }
-
-// ---------------------------------------------------------------------------
-// Download (mock-friendly)
-// ---------------------------------------------------------------------------
 
 async function cmdDownload(args) {
   const root = args.root;
@@ -182,8 +184,7 @@ async function cmdDownload(args) {
   }
 
   try {
-    const { sdk } = loaded;
-    const Indexer = sdk.Indexer || sdk.default?.Indexer;
+    const { Indexer } = await import("@0gfoundation/0g-storage-ts-sdk");
     const idx = new Indexer(indexer);
     const err = await idx.download(root, out, true);
     if (err) throw new Error(String(err));
@@ -194,13 +195,9 @@ async function cmdDownload(args) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Long-running HTTP server (used by docker compose `og-bridge` profile).
-// ---------------------------------------------------------------------------
-
 async function cmdServe(args) {
   const port = parseInt(args.port || process.env.OG_BRIDGE_PORT || "8200", 10);
-  const server = http.createServer(async (req, res) => {
+  const server = http.createServer((req, res) => {
     if (req.method === "GET" && req.url === "/healthz") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "ok" }));
@@ -216,8 +213,8 @@ async function cmdServe(args) {
             res.writeHead(400);
             return res.end(JSON.stringify({ error: "missing file" }));
           }
-          // Reuse the upload command path.
-          const buf = readFileSync(file);
+          const abs = resolve(file);
+          const buf = readFileSync(abs);
           const rpc = process.env.OG_EVM_RPC || "";
           const indexer = process.env.OG_INDEXER_RPC || "";
           const pk = process.env.OG_PRIVATE_KEY || "";
@@ -233,9 +230,7 @@ async function cmdServe(args) {
             );
             return;
           }
-          // Live path — same as cmdUpload, inlined for simplicity.
-          const loaded = await loadSdk();
-          if (!loaded) {
+          if (!(await loadSdk())) {
             const root = deterministicRoot(buf);
             res.end(
               JSON.stringify({
@@ -247,23 +242,13 @@ async function cmdServe(args) {
             );
             return;
           }
-          const { sdk, ethers } = loaded;
-          const ZgFile = sdk.ZgFile || sdk.default?.ZgFile;
-          const Indexer = sdk.Indexer || sdk.default?.Indexer;
-          const zgFile = await ZgFile.fromFilePath(file);
-          const [tree] = await zgFile.merkleTree();
-          const root = tree.rootHash();
-          const provider = new ethers.JsonRpcProvider(rpc);
-          const wallet = new ethers.Wallet(pk, provider);
-          const idx = new Indexer(indexer);
-          const [tx] = await idx.upload(zgFile, rpc, wallet);
-          await zgFile.close();
+          const { root, tx_hash, size } = await liveUploadFile(abs, rpc, indexer, pk);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({
               root,
-              tx_hash: String(tx?.hash || tx?.txHash || ""),
-              size: buf.length,
+              tx_hash,
+              size,
               mode: "live",
             })
           );
@@ -281,10 +266,6 @@ async function cmdServe(args) {
     console.log(`og-bridge listening on :${port}`);
   });
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 const [, , cmd, ...rest] = process.argv;
 const args = parseArgs(rest);

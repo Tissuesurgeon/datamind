@@ -12,16 +12,16 @@ economy. Three surfaces are wired:
 Every 0G surface ships with a deterministic mock so the demo runs without any
 keys. Setting the env vars below flips the corresponding surface to **live**:
 
-| Surface       | Mock default                            | Live switch                                                                |
-|---------------|------------------------------------------|----------------------------------------------------------------------------|
-| 0G Storage    | SHA-256 root + local mirror              | `DATAMIND_OG_MOCK=0` + `OG_PRIVATE_KEY`, `OG_INDEXER_RPC`, `OG_EVM_RPC`     |
-| 0G Compute    | LocalRunner (calls ai-engine HTTP)       | `OGComputeRunner` activates when storage is live                           |
-| Chain         | in-memory registry                       | deploy contracts then set `DATASET_REGISTRY_ADDRESS` / `LICENSE_REGISTRY_ADDRESS` |
+| Surface    | Mock default                         | Live switch |
+|------------|--------------------------------------|-------------|
+| 0G Storage | SHA-256 root + local mirror        | `DATAMIND_OG_MOCK=0` + `OG_PRIVATE_KEY`, `OG_INDEXER_RPC`, `OG_EVM_RPC` |
+| 0G Compute | LocalRunner (calls ai-engine HTTP) | `OGComputeRunner` activates when storage is live |
+| Chain      | in-memory registry                 | Deploy contracts then set `DATASET_REGISTRY_ADDRESS` / `LICENSE_REGISTRY_ADDRESS` |
 
 ## Storage bridge
 
-`infra/og-bridge/cli.mjs` is a Node sidecar that wraps `@0glabs/0g-ts-sdk`. The
-Python backend calls it via subprocess.
+`infra/og-bridge/cli.mjs` is a Node sidecar that wraps **`@0gfoundation/0g-storage-ts-sdk`**
+([quickstart](https://build.0g.ai/storage/)). The Python backend calls it via subprocess.
 
 ```bash
 # CLI
@@ -95,4 +95,4 @@ Restart the backend; `/health` should now report `og: live, chain: live`.
 
 - 0G docs: https://docs.0g.ai/
 - Galileo explorer: https://chainscan-galileo.0g.ai/
-- Storage SDK: https://github.com/0glabs/0g-ts-sdk
+- Storage (Builder Hub): https://build.0g.ai/storage/

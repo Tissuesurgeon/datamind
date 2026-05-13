@@ -29,7 +29,7 @@ datamind/
   backend/          FastAPI + SQLAlchemy + Alembic + Qdrant + Redis pubsub WS
   ai-engine/        SentenceTransformers + LoRA (PEFT/TRL) + analyzers
   smart-contracts/  Foundry: DatasetRegistry.sol + LicenseRegistry.sol
-  infra/og-bridge/  Node bridge to @0glabs/0g-ts-sdk
+  infra/og-bridge/  Node bridge to @0gfoundation/0g-storage-ts-sdk
   docker/           Per-service Dockerfiles + docker-compose.yml
   scripts/          run.sh, seed data
   docs/             ARCHITECTURE / API / 0G / DEMO

@@ -57,7 +57,7 @@ datamind/
   backend/          FastAPI + SQLAlchemy + Alembic + Qdrant + Redis pubsub WS
   ai-engine/        SentenceTransformers + LoRA (PEFT/TRL) + dataset analyzers
   smart-contracts/  Foundry — DatasetRegistry.sol + LicenseRegistry.sol
-  infra/og-bridge/  Node bridge to @0glabs/0g-ts-sdk (real-mode 0G uploads)
+  infra/og-bridge/  Node bridge to @0gfoundation/0g-storage-ts-sdk (real-mode 0G uploads)
   docker/           Per-service Dockerfiles + docker-compose.yml
   scripts/          run.sh, seed data, deploy helpers
   docs/             Architecture, API, 0G integration, demo flow
@@ -143,7 +143,7 @@ Full walkthrough in [`docs/DEMO.md`](docs/DEMO.md).
 
 **Data** — PostgreSQL 16 · Qdrant 1.11 · Redis 7
 
-**Web3** — Solidity 0.8 · Foundry · ethers/web3.py · `@0glabs/0g-ts-sdk` (Node bridge)
+**Web3** — Solidity 0.8 · Foundry · ethers/web3.py · `@0gfoundation/0g-storage-ts-sdk` (Node bridge)
 
 **Infra** — Docker · Docker Compose · Vercel-ready frontend · Railway-ready backend
 

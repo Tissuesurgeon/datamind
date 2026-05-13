@@ -2,7 +2,7 @@
 
 ## og-bridge
 
-Node sidecar that wraps `@0glabs/0g-ts-sdk` for storage uploads + downloads.
+Node sidecar that wraps `@0gfoundation/0g-storage-ts-sdk` for storage uploads + downloads ([0G Storage](https://build.0g.ai/storage/)).
 The Python backend shells to it via `infra/og-bridge/cli.mjs`. In mock mode it
 returns deterministic hashes so the demo runs without npm install.
 
