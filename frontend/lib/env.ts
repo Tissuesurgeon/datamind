@@ -73,7 +73,9 @@ export const ENV = {
   privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID || "",
   chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || "16602"),
   githubUrl: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com",
-  docsUrl: process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.0g.ai",
+  docsUrl:
+    process.env.NEXT_PUBLIC_DOCS_URL ||
+    "https://docs.google.com/document/d/1odF1wLrIvBZknjOHNQkVxi8cSEA0V_b48VRvzKSJEg4/edit?usp=sharing",
 };
 
 export const PRIVY_LIVE = ENV.privyAppId.length > 0;

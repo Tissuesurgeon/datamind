@@ -76,7 +76,14 @@ export function Hero() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="ghost">
-              <Link href={secondary.href}>{secondary.label}</Link>
+              <Link
+                href={secondary.href}
+                {...("external" in secondary && secondary.external
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
+              >
+                {secondary.label}
+              </Link>
             </Button>
           </motion.div>
 

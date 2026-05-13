@@ -6,6 +6,10 @@
  * no period on big headlines (Linear/Vercel/Immutable cadence).
  */
 
+/** Public DataMind product doc (architecture + general docs). */
+export const DATAMIND_PUBLIC_DOC_URL =
+  "https://docs.google.com/document/d/1odF1wLrIvBZknjOHNQkVxi8cSEA0V_b48VRvzKSJEg4/edit?usp=sharing";
+
 export const LANDING = {
   nav: {
     links: [
@@ -24,7 +28,11 @@ export const LANDING = {
     gradientWord: "economy",
     sub: "DataMind turns raw files into intelligent, discoverable, reusable AI assets — stored on 0G, owned by you, monetizable on day one.",
     primary: { href: "/dashboard", label: "Launch dashboard" },
-    secondary: { href: "/docs/ARCHITECTURE.md", label: "Read architecture" },
+    secondary: {
+      href: DATAMIND_PUBLIC_DOC_URL,
+      label: "Read architecture",
+      external: true,
+    },
     trust: "Built on 0G Galileo Testnet · Foundry-verified provenance · MIT licensed",
   },
 
@@ -281,7 +289,11 @@ chain = await registry.register_dataset(
     title: "The decentralized economy for AI data starts here.",
     sub: "Spin up the full stack in a single script. No keys required for the demo.",
     primary: { href: "/dashboard", label: "Connect wallet" },
-    secondary: { href: "https://docs.0g.ai", label: "Read docs" },
+    secondary: {
+      href: DATAMIND_PUBLIC_DOC_URL,
+      label: "Read docs",
+      external: true,
+    },
     tertiary: { href: "https://github.com", label: "View on GitHub" },
   },
 
@@ -302,7 +314,11 @@ chain = await registry.register_dataset(
           { href: "/dashboard", label: "Dashboard" },
           { href: "https://github.com", label: "GitHub", external: true },
           { href: "/docs/API.md", label: "API" },
-          { href: "/docs/ARCHITECTURE.md", label: "Architecture" },
+          {
+            href: DATAMIND_PUBLIC_DOC_URL,
+            label: "Architecture",
+            external: true,
+          },
         ],
       },
       {
